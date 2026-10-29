@@ -74,8 +74,9 @@ and the page at http://127.0.0.1:8501. Details are in `tester/README.md`.
    - Unzip `auzy-ai-api.zip`.
    - Unzip `auzy-risk-model-xlmr.zip` into `assistant/models/`, so that `assistant/models/risk-xlmr/model.safetensors` and
      `assistant/models/risk-tfidf.joblib` exist.
-   - The same code is also a git repository (`auzy-ai-api/`, one commit) that you can push to your code host. The
-     model is not in it; `.gitignore` keeps it out.
+   - The same code is also a git repository: the `auzy-ai-api/` folder, and the private GitHub repository
+     `ahmedbahaeddineabid/ausy_help`, which you can clone or move to your code host. The model is not in it;
+     `.gitignore` keeps it out.
 3. **Configure**
    - Copy `.env.example` to `.env` and fill it in.
    - Use a **new** Anthropic API key. The development key was shared in a chat and must be revoked.
