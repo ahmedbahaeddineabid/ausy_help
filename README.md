@@ -65,6 +65,9 @@ python tester/run_local.py                 # real Claude, with ANTHROPIC_API_KEY
 This starts auzy-risk (if its model is unzipped), the API with in-memory storage and sample professionals and tests,
 and the page at http://127.0.0.1:8501. Details are in `tester/README.md`.
 
+The page also runs on Streamlit Community Cloud, so testers need nothing installed. It then starts its own API inside
+the app, without the risk model. The steps and safety settings are in `tester/README.md`.
+
 ## Transfer steps
 
 1. **Check the archives**
@@ -116,11 +119,11 @@ and the page at http://127.0.0.1:8501. Details are in `tester/README.md`.
 
 | Check | Result |
 |---|---|
-| `npm test` in `auzy-ai-v2/` | **81 pass**: engine 57, HTTP API 17, auzy-backend kit 7. The kit test runs the kit's files against stand-ins for auzy-backend's modules. |
+| `npm test` in `auzy-ai-v2/` | **81 pass** on Node 22 and on Node 24 (the one the tester gets on Streamlit Community Cloud): engine 57, HTTP API 17, auzy-backend kit 7. The kit test runs the kit's files against stand-ins for auzy-backend's modules. |
 | `test/mongo.store.check.mjs` | **9/9** against a real MongoDB (throwaway database) |
 | `test/e2e.local.mjs`: real API process, real MongoDB, real auzy-risk, stand-ins for Claude and auzy-backend, one restart midway | **9/9**: crisis → escalation and alert; tool cards; analysis delivered; state kept across the restart; idle analysis; risk service down → careful model |
 | `python -m assistant.test_risk_server` (project root) | **8/8** |
-| `python tester/test_app.py`: the tester page driven like a user, against the API process with a stand-in for Claude | **15/15** |
+| `python tester/test_app.py`: the tester page driven like a user, with a stand-in for Claude: against a running API, then in the built-in mode used on Streamlit Community Cloud | **22/22** |
 | `test/integration.risk.mjs` (engine against auzy-risk) | passes; 31 ms per message on CPU |
 | The patches | apply cleanly to the files of the 2026-10-27 export, and the patched files still parse |
 

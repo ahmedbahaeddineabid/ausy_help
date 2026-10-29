@@ -12,13 +12,14 @@ from __future__ import annotations
 
 import argparse
 import os
-import secrets
 import socket
 import subprocess
 import sys
 import time
 import urllib.request
 from pathlib import Path
+
+import builtin_api
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -58,7 +59,6 @@ def main():
         if not port_free(port):
             sys.exit(f"Port {port} is already in use: stop what uses it, or choose another with --api-port / --ui-port.")
 
-    service_key, staff_token = secrets.token_hex(32), secrets.token_hex(32)
     procs: list[subprocess.Popen] = []
     try:
         if args.no_risk:
@@ -75,20 +75,15 @@ def main():
             print("auzy-risk: ready." if wait_http(f"{RISK_URL}/health", 120)
                   else "auzy-risk: not ready after 2 minutes; the careful model answers every message meanwhile.")
 
-        api_env = {**os.environ, "NODE_ENV": "development", "PORT": str(args.api_port), "HOST": "127.0.0.1", "STORE": "memory",
-                   "AUZY_MODE": "demo", "AUZY_AI_API_KEY": service_key, "AUZY_AI_STAFF_TOKEN": staff_token, "RISK_SERVICE_URL": RISK_URL}
-        if args.stand_in:
-            sys.path.insert(0, str(HERE))
-            import stand_in_claude
-            server = stand_in_claude.start()
-            api_env.update(ANTHROPIC_API_KEY="stand-in", ANTHROPIC_BASE_URL=f"http://127.0.0.1:{server.server_address[1]}")
-        procs.append(subprocess.Popen(["node", "server/index.js"], cwd=ROOT / "auzy-ai-v2", env=api_env))
-        api_url = f"http://127.0.0.1:{args.api_port}"
-        if not wait_http(f"{api_url}/v1/health", 30):
-            sys.exit("The API did not start: see its messages above.")
+        try:
+            api = builtin_api.start(port=args.api_port, risk_url=RISK_URL,
+                                    anthropic_key=None if args.stand_in else os.environ["ANTHROPIC_API_KEY"])
+        except RuntimeError as e:
+            sys.exit(f"The API could not start: {e}")
+        procs.append(api.process)
 
         ui_env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}      # the page never needs the Claude key
-        ui_env.update(AUZY_AI_URL=api_url, AUZY_AI_API_KEY=service_key, AUZY_AI_STAFF_TOKEN=staff_token,
+        ui_env.update(AUZY_AI_URL=api.url, AUZY_AI_API_KEY=api.service_key, AUZY_AI_STAFF_TOKEN=api.staff_token,
                       AUZY_TESTER_STAND_IN="1" if args.stand_in else "")
         procs.append(subprocess.Popen([sys.executable, "-m", "streamlit", "run", "app.py", "--server.port", str(args.ui_port),
                                        "--server.address", "127.0.0.1", "--browser.gatherUsageStats", "false",
@@ -108,6 +103,7 @@ def main():
                 p.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 p.kill()
+        builtin_api.stop_all()                              # and the stand-in, if any
 
 
 if __name__ == "__main__":

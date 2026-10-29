@@ -1,20 +1,28 @@
 """Auzy AI tester: chat with the assistant through the API as a test patient, and read the staff views.
 
     python tester/run_local.py           starts the API (and auzy-risk) locally, then this page
-    cd tester && streamlit run app.py    this page only, for an API that is already running
+    cd tester && streamlit run app.py    this page only: with AUZY_AI_URL, for an API that is already running;
+                                         without it, the page starts its own API (built-in mode, as on Streamlit
+                                         Community Cloud)
 
-The sidebar holds the API address and keys (defaults: AUZY_AI_URL, AUZY_AI_API_KEY, AUZY_AI_STAFF_TOKEN). The page
-sends each message the way auzy-backend does. With a real Claude key every message costs money (about 0.1-1 cent;
-a crisis conversation about 6 cents), and a crisis message alerts the care-team webhook if the API has one.
+Settings come from the environment or, on Community Cloud, from the app's secrets:
+- AUZY_AI_URL, AUZY_AI_API_KEY, AUZY_AI_STAFF_TOKEN: the API to use; the sidebar can change them.
+- Built-in mode: ANTHROPIC_API_KEY for real Claude (stand-in replies at no cost without it); TESTER_MAX_SPEND_USD
+  (default 1) pauses messages once the built-in API has spent that much since it started.
+- TESTER_PASSWORD: asked before anything else, when set.
+The page sends each message the way auzy-backend does. With a real Claude key every message costs money (about
+0.1-1 cent; a crisis conversation about 6 cents), and a crisis message alerts the care-team webhook if the API has one.
 """
 from __future__ import annotations
 
+import hmac
 import os
 import re
 import secrets
 
 import streamlit as st
 
+import builtin_api
 from api_client import Api, ApiError
 
 st.set_page_config(page_title="Auzy AI tester", page_icon="💬", layout="wide")
@@ -53,9 +61,55 @@ NO_SWITCH = "—"
 CARD_LABELS = {"profiles": "Professionals", "appointments": "Appointments", "tests": "Screening tests"}
 
 ss = st.session_state
-ss.setdefault("api_url", os.environ.get("AUZY_AI_URL", "http://127.0.0.1:8080"))
-ss.setdefault("service_key", os.environ.get("AUZY_AI_API_KEY", ""))
-ss.setdefault("staff_token", os.environ.get("AUZY_AI_STAFF_TOKEN", ""))
+
+
+def setting(name: str, default: str = "") -> str:
+    """From the app's secrets (Streamlit Community Cloud) or the environment."""
+    try:
+        if name in st.secrets:
+            return str(st.secrets[name])
+    except Exception:  # noqa: BLE001 (no secrets file)
+        pass
+    return os.environ.get(name, default)
+
+
+password = setting("TESTER_PASSWORD")
+if password and not ss.get("signed_in"):
+    st.title("Auzy AI tester")
+    typed_password = st.text_input("Password", type="password")
+    if typed_password and hmac.compare_digest(typed_password.encode(), password.encode()):
+        ss.signed_in = True
+        st.rerun()
+    if typed_password:
+        st.error("Wrong password.")
+    st.stop()
+
+
+@st.cache_resource(show_spinner="Starting the built-in API (the first start installs its packages: up to a minute)…")
+def start_builtin_api(real_claude: bool) -> builtin_api.RunningApi:
+    return builtin_api.start(anthropic_key=setting("ANTHROPIC_API_KEY") if real_claude else None)
+
+
+builtin = None                                          # the page's own API, when no AUZY_AI_URL is set
+if not setting("AUZY_AI_URL"):
+    real_claude = bool(setting("ANTHROPIC_API_KEY"))
+    try:
+        builtin = start_builtin_api(real_claude)
+        if not builtin.alive():                         # it stopped: start a new one (what it held in memory is gone)
+            builtin.stop()
+            start_builtin_api.clear()
+            builtin = start_builtin_api(real_claude)
+    except RuntimeError as e:
+        st.error(f"The built-in API could not start: {e}")
+        st.stop()
+    ss.api_url, ss.service_key, ss.staff_token = builtin.url, builtin.service_key, builtin.staff_token
+try:
+    spend_limit = float(setting("TESTER_MAX_SPEND_USD", "1"))
+except ValueError:
+    spend_limit = 1.0
+ss.setdefault("api_url", setting("AUZY_AI_URL", "http://127.0.0.1:8080"))
+ss.setdefault("service_key", setting("AUZY_AI_API_KEY"))
+ss.setdefault("staff_token", setting("AUZY_AI_STAFF_TOKEN"))
 ss.setdefault("conversation_id", secrets.token_hex(12))
 ss.setdefault("profile_id", secrets.token_hex(12))
 ss.setdefault("credits", 10)
@@ -111,9 +165,13 @@ def persona():
 # ---------------------------------------------------------------- sidebar
 with st.sidebar:
     st.header("API")
-    st.text_input("API address", key="api_url")
-    st.text_input("Service key (AUZY_AI_API_KEY)", type="password", key="service_key")
-    st.text_input("Staff token (AUZY_AI_STAFF_TOKEN)", type="password", key="staff_token")
+    if builtin:
+        st.caption("Built-in API, started by this page: in-memory storage (emptied when the app restarts), sample "
+                   "professionals and tests. Everyone using the page shares it: the staff tabs show every tester's conversations.")
+    else:
+        st.text_input("API address", key="api_url")
+        st.text_input("Service key (AUZY_AI_API_KEY)", type="password", key="service_key")
+        st.text_input("Staff token (AUZY_AI_STAFF_TOKEN)", type="password", key="staff_token")
     health = fetch_health(ss.api_url)
     if "error" in health:
         st.error(health["error"])
@@ -149,6 +207,32 @@ api = Api(ss.api_url, ss.service_key, ss.staff_token)
 cid = ss.conversation_id.strip().lower()
 pid = ss.profile_id.strip().lower()
 ids_ok = bool(HEX24.match(cid) and HEX24.match(pid))
+stand_in = builtin.stand_in if builtin else os.environ.get("AUZY_TESTER_STAND_IN") == "1"
+
+
+def spent_usd() -> float | None:
+    try:
+        return float(api.costs(365).get("totalUsd") or 0)
+    except ApiError:
+        return None
+
+
+def spend_paused() -> bool:
+    """Built-in API with real Claude: has it spent TESTER_MAX_SPEND_USD since it started? Tells the tester if so."""
+    if not builtin or builtin.stand_in:
+        return False
+    spent = spent_usd()
+    if spent is None or spent < spend_limit:
+        return False
+    st.warning(f"The spend limit is reached (${spend_limit:.2f} since the app started): messages and analyses are paused. "
+               "The app's owner can raise TESTER_MAX_SPEND_USD or reboot the app.")
+    return True
+
+
+if builtin and not builtin.stand_in:
+    spent = spent_usd()
+    st.sidebar.caption(f"Real Claude · spent since the app started: {'—' if spent is None else f'${spent:.4f}'} "
+                       f"of the ${spend_limit:.2f} limit")
 
 
 # ---------------------------------------------------------------- rendering helpers
@@ -225,7 +309,9 @@ def send(text: str):
     if ss.credits <= 0:
         st.warning("No credits left: add credits in the sidebar or start a new conversation.")
         return
-    notes = [LANGUAGE_NOTES[ss.lang_switch]] if ss.lang_switch in LANGUAGE_NOTES else []
+    if spend_paused():
+        return
+    notes =[LANGUAGE_NOTES[ss.lang_switch]] if ss.lang_switch in LANGUAGE_NOTES else []
     payload = {"conversationId": cid, "profileId": pid, "text": text, "persona": persona(), "notes": notes,
                "creditsRemaining": ss.credits - 1, "freeConsultationEligible": bool(ss.eligible)}
     ss.messages.append({"role": "user", "text": text, "notes": notes})
@@ -246,8 +332,8 @@ def send(text: str):
 # ---------------------------------------------------------------- page
 st.title("Auzy AI tester")
 st.caption("You are the patient; the page plays auzy-backend's part. Messages go to the API with the service key; "
-           "the staff tabs use the staff token.")
-if os.environ.get("AUZY_TESTER_STAND_IN") == "1":
+           "the staff tabs use the staff token." + (" A test page: don't write real personal information." if builtin else ""))
+if stand_in:
     st.info("Stand-in Claude: replies are canned and cost nothing. They check the screens and flows, not the assistant's quality.")
 
 tab_chat, tab_conversation, tab_summaries, tab_costs = st.tabs(["Chat", "Conversation", "Summaries", "Costs"])
@@ -266,7 +352,7 @@ with tab_chat:
         st.caption("The crisis samples alert the care-team webhook if the API has ESCALATION_WEBHOOK_URL set.")
     left, right = st.columns(2)
     if left.button("End the conversation now", width="stretch",
-                   help="Runs the end-of-conversation analysis now; normally automatic (0 credits, or 30 minutes without a message)."):
+                   help="Runs the end-of-conversation analysis now; normally automatic (0 credits, or 30 minutes without a message).") and not spend_paused():
         try:
             with st.spinner("Analysing the conversation…"):
                 ss.last_end = api.end(cid)
