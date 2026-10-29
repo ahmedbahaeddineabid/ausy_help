@@ -12,6 +12,7 @@ __pycache__/
 # trained models: shipped separately (auzy-risk-model-xlmr.zip)
 assistant/models/risk-xlmr/
 assistant/models/risk-tfidf.joblib
+assistant/models/README.txt
 
 # runtime and test output
 assistant/data/escalations.jsonl

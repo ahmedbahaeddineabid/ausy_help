@@ -24,7 +24,7 @@ and screening tests.
 | `docker-compose.yml`, `.env.example` | Run the API and auzy-risk together |
 | `docs/progress-report.html` | Project report: decisions, measured costs, open questions |
 
-The trained risk models come in a separate archive, `auzy-risk-model-xlmr.zip` (1.1 GB): XLM-R and the small TF-IDF fallback.
+The trained risk models come in a separate archive, `auzy-risk-model-xlmr.zip` (818 MB; 1.1 GB unzipped): XLM-R and the small TF-IDF fallback.
 
 ## How it fits into Auzy
 
