@@ -418,6 +418,7 @@ flowchart TD
           <tr><td>Automated tests, with stand-ins for Claude, the database and auzy-backend</td><td><span class="pill done">81 pass</span></td><td>Engine (routing, safety, cards, credits, sessions, analysis, budget), HTTP API (keys, validation, every endpoint, retries, idle analysis), and the auzy-backend kit end to end</td></tr>
           <tr><td>MongoDB storage, against a real MongoDB</td><td><span class="pill done">9 / 9</span></td><td>Sessions, summaries, cost ledger, analyses and their delivery, indexes</td></tr>
           <tr><td>Full local run: API process, MongoDB, auzy-risk; stand-ins for Claude and auzy-backend</td><td><span class="pill done">9 / 9</span></td><td>Crisis → escalation and alert, cards, analysis delivered, state kept across a restart, risk service down</td></tr>
+          <tr><td>Streamlit tester page, driven like a user against the API (stand-in for Claude)</td><td><span class="pill done">15 / 15</span></td><td>Replies, cards, emergency banner, staff views, clearing an escalation, closing at 0 credits, costs</td></tr>
           <tr><td>auzy-risk service tests, real model</td><td><span class="pill done">8 pass</span></td><td>Derja and Arabic phrases, indirect risk, a risk sentence at the end of an 8,000-character message</td></tr>
           <tr><td>Engine and auzy-risk together over HTTP</td><td><span class="pill done">pass</span></td><td>All routing paths, 31 ms per check</td></tr>
           <tr><td>Live runs with real Claude calls</td><td><span class="pill done">3 runs</span></td><td>Engine, 27 October: every request format accepted; caching works from the second message. Not yet repeated through the API.</td></tr>
@@ -501,6 +502,7 @@ flowchart TD
 
     <h2 id="next-steps">Next steps</h2>
     <ol>
+      <li>Try the assistant with the Streamlit tester (<code>python tester/run_local.py</code>), in each language, before touching Auzy.</li>
       <li>Install the API and auzy-risk on a test server, following the transfer steps in the package README, and check <code>/v1/health</code>.</li>
       <li>Add the kit to auzy-backend, list the test accounts, and chat in each language using the checklist in <code>auzy-ai-v2/README.md</code>.</li>
       <li>Clinical review of the Arabic and Derja material, the Derja sample and the summary rules; retrain the risk model.</li>
@@ -516,6 +518,7 @@ flowchart TD
         <tbody>
           <tr><td><code>README.md</code>, <code>docker-compose.yml</code>, <code>.env.example</code></td><td>Transfer steps and deployment of the API and auzy-risk</td></tr>
           <tr><td><code>auzy-ai-v2/</code></td><td>The API (server, engine, tests, OpenAPI spec), the auzy-backend kit and patches (<code>integration/</code>), and the developer reference (README)</td></tr>
+          <tr><td><code>tester/</code></td><td>A Streamlit page for trying the assistant without Auzy (<code>python tester/run_local.py</code> starts everything on one machine)</td></tr>
           <tr><td><code>assistant/</code></td><td>The auzy-risk service and its Dockerfile, crisis phrase lists, risk model training, training-data generation</td></tr>
           <tr><td><code>assistant/models/</code></td><td>The trained risk models (XLM-R, about 1.1 GB, and a lighter backup), shipped as a separate archive</td></tr>
           <tr><td><code>assistant/data/</code></td><td>Generated training messages, the Derja review sample, the spending ledger</td></tr>

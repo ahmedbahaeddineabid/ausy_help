@@ -156,7 +156,8 @@ node --env-file=../.env server/index.js          # with RISK_SERVICE_URL=http://
 ```
 
 For a first try without MongoDB or auzy-backend, set `STORE=memory` and `AUZY_MODE=demo` in `.env`. Everything is
-lost when the process stops.
+lost when the process stops. Simpler still, `python ../tester/run_local.py` starts auzy-risk, the API in that mode and
+the Streamlit tester page together (see `../tester/README.md`).
 
 ## Testing inside Auzy (test accounts)
 

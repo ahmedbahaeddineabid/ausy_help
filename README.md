@@ -20,6 +20,7 @@ and screening tests.
 |---|---|
 | `auzy-ai-v2/` | The API (Node 20+):<br>`server/` HTTP API<br>`src/` the engine<br>`integration/` code to add to auzy-backend<br>tests, `openapi.yaml`, `README.md` (API reference) |
 | `assistant/` | **auzy-risk**, the safety service (Python): crisis phrases in 4 languages plus a multilingual risk model. Also the pipeline that built and trained the model. |
+| `tester/` | A Streamlit page for trying the assistant without Auzy: chat as a test patient, see the cards, the emergency banner, the clinician summaries and the costs |
 | `mh_dataset/` | The dataset build behind the risk model |
 | `docker-compose.yml`, `.env.example` | Run the API and auzy-risk together |
 | `docs/progress-report.html` | Project report: decisions, measured costs, open questions |
@@ -50,6 +51,19 @@ after the conversation (credits reach 0, or 30 min without a message):
 - If the API can't be reached, the message is answered by today's chat.
 
 **Rollback:** set `AI_V2_ENABLED=false` in auzy-backend. There is nothing else to undo.
+
+## Try it first, without Auzy
+
+The tester runs on one machine. It needs Node 20.6+ and Python 3.12, and runs `npm ci --omit=dev` in `auzy-ai-v2/`
+and `pip install -r tester/requirements.txt`.
+
+```bash
+python tester/run_local.py --stand-in      # canned replies, no cost: check the screens and flows
+python tester/run_local.py                 # real Claude, with ANTHROPIC_API_KEY set (about 0.1-1 cent per message)
+```
+
+This starts auzy-risk (if its model is unzipped), the API with in-memory storage and sample professionals and tests,
+and the page at http://127.0.0.1:8501. Details are in `tester/README.md`.
 
 ## Transfer steps
 
@@ -105,6 +119,7 @@ after the conversation (credits reach 0, or 30 min without a message):
 | `test/mongo.store.check.mjs` | **9/9** against a real MongoDB (throwaway database) |
 | `test/e2e.local.mjs`: real API process, real MongoDB, real auzy-risk, stand-ins for Claude and auzy-backend, one restart midway | **9/9**: crisis → escalation and alert; tool cards; analysis delivered; state kept across the restart; idle analysis; risk service down → careful model |
 | `python -m assistant.test_risk_server` (project root) | **8/8** |
+| `python tester/test_app.py`: the tester page driven like a user, against the API process with a stand-in for Claude | **15/15** |
 | `test/integration.risk.mjs` (engine against auzy-risk) | passes; 31 ms per message on CPU |
 | The patches | apply cleanly to the files of the 2026-10-27 export, and the patched files still parse |
 

@@ -1,0 +1,6 @@
+# Read when the page is started from this folder (cd tester && streamlit run app.py).
+[server]
+address = "127.0.0.1"          # local only: the page holds the API keys
+
+[browser]
+gatherUsageStats = false       # send no usage statistics to Streamlit
