@@ -1,0 +1,33 @@
+--- a/auzy-frontend/src/pages/chat/ChatWindow.jsx	2026-10-27 12:42:10.625131200 +0100
++++ b/auzy-frontend/src/pages/chat/ChatWindow.jsx	2026-10-27 12:42:10.625131200 +0100
+@@ -16,6 +16,11 @@
+     const chatLanguage = useChatStore((s) => s.chatLanguage);
+     const dir = RTL_LANGUAGES.includes(chatLanguage) ? "rtl" : "ltr";
+ 
++    // AI v2: when the conversation is escalated, keep the emergency information visible at the top.
++    // The latest assistant message carries the current state (a clinician can clear an escalation).
++    const latestAi = [...(messages || [])].reverse().find((m) => m.role === "assistant" && m.metadata?.ai);
++    const emergencyText = latestAi?.metadata?.ai?.escalated ? latestAi.metadata.ai.emergencyText : null;
++
+     // Scroll to bottom on mount
+     useEffect(() => {
+         messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+@@ -42,6 +47,18 @@
+                 <span>{t('chat.adBannerText', 'Your Ad Here! Promote your product or service.')}</span>
+             </AdBanner>
+ 
++            {/* Emergency banner (escalated conversation) */}
++            {emergencyText && (
++                <div className="px-4 pt-4">
++                    <div className="max-w-4xl mx-auto">
++                        <Alert variant="destructive" role="alert">
++                            <AlertCircle className="h-4 w-4" />
++                            <AlertDescription>{emergencyText}</AlertDescription>
++                        </Alert>
++                    </div>
++                </div>
++            )}
++
+             {/* Error Alert */}
+             {error && (
+                 <div className="px-4 pt-4">

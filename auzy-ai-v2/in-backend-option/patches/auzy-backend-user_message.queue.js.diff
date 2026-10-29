@@ -1,0 +1,15 @@
+--- a/auzy-backend/src/queues/user_message.queue.js	2026-10-27 12:42:10.625131200 +0100
++++ b/auzy-backend/src/queues/user_message.queue.js	2026-10-27 12:42:10.625131200 +0100
+@@ -29,5 +29,11 @@
+     // ignore duplicate save attempts
+   }
+ 
+-  return pushToQueue("completion_request", { conversation: messageData.conversation });
++  // AI v2: system messages (the chat-language switch) need no reply of their own; they reach Claude with the
++  // patient's next message. creditsRemaining lets the assistant close warmly when credits run out.
++  if (messageData.role !== "user") return;
++  return pushToQueue("completion_request", {
++    conversation: messageData.conversation,
++    creditsRemaining: messageData.creditsRemaining ?? null,
++  });
+ });

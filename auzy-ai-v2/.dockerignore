@@ -1,0 +1,8 @@
+node_modules
+test
+integration
+in-backend-option
+*.md
+openapi.yaml
+.env
+.env.*

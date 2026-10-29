@@ -1,0 +1,419 @@
+openapi: 3.1.0
+info:
+  title: Auzy AI API
+  version: 2.0.0
+  description: |
+    The Auzy patient chat assistant (AI v2) as a service. auzy-backend sends each patient turn; the API answers with
+    the reply, the card ids and the escalation state. After a conversation (credits run out, or 30 minutes without a
+    message) it writes one analysis: the Cognisys update, the clinician summary and, when due, the patient's
+    pre-diagnostic, and delivers it to auzy-backend (see `webhooks`).
+
+    Ids are Auzy's MongoDB ids (24 hexadecimal characters). Errors are `{ "error": "<code>", "message": "..." }`.
+    Internal network only.
+servers:
+  - url: http://auzy-ai-api:8080
+security:
+  - serviceKey: []
+
+paths:
+  /v1/messages:
+    post:
+      summary: One patient turn
+      description: |
+        Messages of one conversation are handled one at a time, in arrival order. Several quick patient messages
+        can be sent together as one `text` (joined with blank lines). A Claude failure still returns 200, with a
+        fallback text in the patient's language and `error` set.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TurnRequest' }
+            example:
+              conversationId: 6650000000000000000000c1
+              profileId: 6650000000000000000000d1
+              text: "Je dors mal ces derniers temps, je me réveille à 3h du matin."
+              persona: { name: Auzy, description: "Assistant de soutien", behavior: chaleureux, rules: ["Réponses courtes"] }
+              notes: ["Chat language: French"]
+              creditsRemaining: 4
+              freeConsultationEligible: true
+              history: []
+      responses:
+        '200':
+          description: The reply to save as the assistant message
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TurnResponse' }
+              example:
+                reply: "Se réveiller chaque nuit à 3h, c'est épuisant. Depuis combien de temps est-ce que ça dure ?"
+                cards: { profiles: [], appointments: [], tests: [] }
+                escalated: false
+                emergencyText: null
+                model: claude-haiku-5-5
+                state: stress
+                riskFlag: null
+                language: fr
+                costUsd: 0.0011
+                conversationCostUsd: 0.0011
+                followUp: []
+                error: null
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/conversations/{id}/end:
+    post:
+      summary: Run the end-of-conversation analysis now
+      description: |
+        Normally not needed: the API runs it by itself when credits reach 0 or after `AI_IDLE_MINUTES` without a
+        message. The result is also delivered to auzy-backend (webhook `analysis`), which is where it gets saved.
+      security: [{ serviceKey: [] }, { staffToken: [] }]
+      parameters: [{ $ref: '#/components/parameters/ConversationId' }]
+      responses:
+        '200':
+          description: Done, or nothing new to analyse
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties: { status: { const: nothing_to_analyse } }
+                  - type: object
+                    properties:
+                      status: { const: done }
+                      analysisId: { type: string }
+                      delivery: { type: string, enum: [delivered, pending, failed, none] }
+                      model: { type: string }
+                      clinicianSummary: { type: object }
+                      cognisys: { type: object }
+                      diagnostic: { type: [object, 'null'] }
+        '409': { description: An analysis of this conversation is already running }
+        '502': { description: The analysis failed; it is retried automatically }
+
+  /v1/conversations/{id}:
+    get:
+      summary: Escalation state, screening signals, summaries, analyses and cost of one conversation
+      security: [{ staffToken: [] }]
+      parameters: [{ $ref: '#/components/parameters/ConversationId' }]
+      responses:
+        '200':
+          description: Conversation state (no transcript)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversationId: { type: string }
+                  profileId: { type: [string, 'null'] }
+                  escalation: { $ref: '#/components/schemas/Escalation' }
+                  language: { type: [string, 'null'], enum: [en, fr, ar, aeb, null] }
+                  sessionNumber: { type: [integer, 'null'] }
+                  turnsThisSession: { type: integer }
+                  totalTurns: { type: integer }
+                  needsAnalysis: { type: boolean }
+                  analysisRunning: { type: boolean }
+                  lastTurnAt: { type: [string, 'null'], format: date-time }
+                  lastAnalysisAt: { type: [string, 'null'], format: date-time }
+                  sessionCostUsd: { type: number }
+                  totalCostUsd: { type: number }
+                  signals: { type: array, items: { type: object } }
+                  summaries: { type: array, items: { $ref: '#/components/schemas/Summary' } }
+                  analyses: { type: array, items: { $ref: '#/components/schemas/Analysis' } }
+        '404': { description: Unknown conversation }
+
+  /v1/conversations/{id}/clear-escalation:
+    post:
+      summary: A clinician has followed up; later replies go back to the routine model
+      security: [{ staffToken: [] }]
+      parameters: [{ $ref: '#/components/parameters/ConversationId' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                clearedBy: { type: string, description: The clinician's profile id }
+      responses:
+        '200':
+          description: cleared is false when the conversation was not escalated
+          content:
+            application/json:
+              schema: { type: object, properties: { cleared: { type: boolean } } }
+
+  /v1/summaries:
+    get:
+      summary: Clinician summaries, urgent first, newest first
+      security: [{ staffToken: [] }]
+      parameters:
+        - { name: urgent, in: query, schema: { type: boolean } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        '200':
+          description: Summaries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Summary' } }
+
+  /v1/costs:
+    get:
+      summary: Claude spend, cost per 1,000 finished conversations and the budget level
+      security: [{ staffToken: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 365, default: 30 } }
+      responses:
+        '200':
+          description: Costs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  since: { type: string, format: date-time }
+                  days: { type: integer }
+                  totalUsd: { type: number }
+                  conversations: { type: integer }
+                  perConversationUsd: { type: number }
+                  finishedConversations: { type: integer }
+                  per1000FinishedUsd: { type: [number, 'null'] }
+                  mostExpensiveConversationUsd: { type: [number, 'null'] }
+                  budget:
+                    type: object
+                    properties:
+                      level: { type: string, enum: [economy, standard, premium] }
+                      targetPer1000Usd: { type: array, items: { type: number } }
+                      conversationCeilingUsd: { type: number }
+                  byKindAndModel:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        kind: { type: string, enum: [chat, second_opinion, urgent_summary, end_analysis] }
+                        model: { type: string }
+                        calls: { type: integer }
+                        usd: { type: number }
+                        outputTokens: { type: integer }
+                        cacheHitShare: { type: number }
+
+  /v1/health:
+    get:
+      summary: Liveness, storage and risk service status (no key needed)
+      security: []
+      responses:
+        '200':
+          description: Up (the API keeps answering without the risk service, using the careful model)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  version: { type: string }
+                  store: { type: object, properties: { kind: { type: string, enum: [mongo, memory] }, ok: { type: boolean } } }
+                  riskService: { type: object, properties: { ok: { type: boolean } } }
+                  auzy: { type: string, enum: [callback, demo] }
+                  budgetLevel: { type: string, enum: [economy, standard, premium] }
+        '503': { description: Storage unavailable }
+
+webhooks:
+  # Calls the API makes to auzy-backend, at AUZY_CALLBACK_URL (e.g. http://auzy-backend:5000/internal/ai), with
+  # Authorization: Bearer <AUZY_CALLBACK_SECRET>. Implemented by integration/auzy-backend/src/routes/.
+  findConsultants:
+    post:
+      summary: POST {AUZY_CALLBACK_URL}/tools/find-consultants
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { search: { type: string }, limit: { type: integer, minimum: 1, maximum: 10 } } }
+      responses:
+        '200':
+          description: Professionals (only the fields the assistant and the cards need)
+          content: { application/json: { schema: { type: object, properties: { profiles: { type: array, items: { type: object } } } } } }
+  appointments:
+    post:
+      summary: POST {AUZY_CALLBACK_URL}/tools/appointments (the patient's own appointments; the role is looked up by auzy-backend)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                profileId: { type: string }
+                when: { type: string, enum: [upcoming, past] }
+                limit: { type: integer }
+      responses:
+        '200':
+          description: Appointments
+          content: { application/json: { schema: { type: object, properties: { appointments: { type: array, items: { type: object } } } } } }
+  tests:
+    post:
+      summary: POST {AUZY_CALLBACK_URL}/tools/tests
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { search: { type: string }, limit: { type: integer, minimum: 1, maximum: 5 } } }
+      responses:
+        '200':
+          description: Published screening tests
+          content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { type: object } } } } } }
+  cognisysSnapshot:
+    get:
+      summary: GET {AUZY_CALLBACK_URL}/cognisys/{profileId}, read before each analysis
+      description: An error fails the analysis (retried later); analysing without the stored profile would overwrite it.
+      responses:
+        '200':
+          description: The stored Cognisys profile, facts, dimensions and recent analyses
+          content: { application/json: { schema: { type: object } } }
+  analysis:
+    post:
+      summary: POST {AUZY_CALLBACK_URL}/analysis, one delivery per analysis
+      description: |
+        Retried with a growing delay (up to about 8 hours) until auzy-backend answers 2xx. Every attempt carries the
+        same analysisId, so a repeat must be ignored (the kit does this with a Redis key).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                analysisId: { type: string }
+                conversationId: { type: string }
+                profileId: { type: string }
+                trigger: { type: string, enum: [credits_exhausted, idle] }
+                model: { type: string }
+                createdAt: { type: string, format: date-time }
+                cognisys: { type: object, description: 'facts, dimensions, analysisAppend, profile' }
+                clinicianSummary: { type: object }
+                diagnostic:
+                  type: [object, 'null']
+                  description: The pre-diagnostic, only at 0 credits for an eligible patient
+                  properties:
+                    summary: { type: string }
+                    concerns:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          name: { type: string }
+                          severity: { type: string, enum: [none, mild, moderate, severe] }
+                          note: { type: string }
+                    recommendation: { type: string }
+      responses:
+        '200': { description: Saved (or a repeat, ignored) }
+
+components:
+  securitySchemes:
+    serviceKey: { type: http, scheme: bearer, description: AUZY_AI_API_KEY (auzy-backend) }
+    staffToken: { type: http, scheme: bearer, description: AUZY_AI_STAFF_TOKEN }
+  parameters:
+    ConversationId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[a-fA-F0-9]{24}$' }
+  responses:
+    BadRequest:
+      description: Invalid request (error invalid_request or invalid_json, with a message)
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Unauthorized:
+      description: Missing or wrong key
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+        message: { type: string }
+    TurnRequest:
+      type: object
+      required: [conversationId, profileId, text]
+      properties:
+        conversationId: { type: string, pattern: '^[a-fA-F0-9]{24}$' }
+        profileId: { type: string, pattern: '^[a-fA-F0-9]{24}$', description: The conversation's owner }
+        text: { type: string, minLength: 1, maxLength: 8000, description: The patient's new message(s) }
+        persona:
+          type: [object, 'null']
+          description: The conversation's assistant (Auzy's Assistant document), or the platform default. Other fields are ignored.
+          properties:
+            name: { type: string }
+            description: { type: string }
+            domain: { type: string }
+            behavior: { type: string }
+            rules: { type: array, items: { type: string } }
+            personalization: { type: [object, string] }
+        notes:
+          type: array
+          maxItems: 10
+          items: { type: string }
+          description: Chat-setting changes since the last turn (e.g. the chat-language switch messages)
+        creditsRemaining:
+          type: [integer, 'null']
+          minimum: 0
+          description: Balance after this message; 0 = the last message for now (closing reply, then the analysis)
+        freeConsultationEligible:
+          type: boolean
+          default: false
+          description: At 0 credits, include the pre-diagnostic and the free consultation offer (eligible and none yet)
+        history:
+          type: array
+          maxItems: 50
+          description: Earlier messages; used only for a conversation's first turn on this API (continuity from the old chat)
+          items:
+            type: object
+            properties:
+              role: { type: string, enum: [user, assistant] }
+              content: { type: string }
+    TurnResponse:
+      type: object
+      properties:
+        reply: { type: string, description: The assistant message to save and show }
+        cards:
+          type: object
+          properties:
+            profiles: { type: array, items: { type: string } }
+            appointments: { type: array, items: { type: string } }
+            tests: { type: array, items: { type: string } }
+        escalated: { type: boolean, description: 'True while the conversation is escalated (until a clinician clears it)' }
+        emergencyText: { type: [string, 'null'], description: Emergency banner text in the patient's language, while escalated }
+        model: { type: [string, 'null'] }
+        state: { type: string, description: Likely state from the risk model (screening signal, not a diagnosis) }
+        riskFlag: { type: [string, 'null'] }
+        language: { type: [string, 'null'], enum: [en, fr, ar, aeb, null] }
+        costUsd: { type: number }
+        conversationCostUsd: { type: number }
+        followUp:
+          type: array
+          items: { type: string, enum: [urgent_summary, end_analysis] }
+          description: Work the API starts by itself after this reply
+        error: { type: [string, 'null'], description: Set when the fallback text was returned }
+    Escalation:
+      type: object
+      properties:
+        active: { type: boolean }
+        since: { type: [string, 'null'], format: date-time }
+        reason: { type: [string, 'null'] }
+        clearedAt: { type: [string, 'null'], format: date-time }
+        clearedBy: { type: [string, 'null'] }
+    Summary:
+      type: object
+      properties:
+        id: { type: string }
+        conversationId: { type: string }
+        profileId: { type: [string, 'null'] }
+        trigger: { type: string, enum: [escalation, credits_exhausted, idle] }
+        model: { type: [string, 'null'] }
+        urgent: { type: boolean }
+        summary: { type: object, description: 'Concerns, symptoms, sleep, appetite, functioning, history, risk and protective factors, screening, consultation, narrative' }
+        createdAt: { type: string, format: date-time }
+    Analysis:
+      type: object
+      properties:
+        id: { type: string }
+        trigger: { type: string }
+        model: { type: [string, 'null'] }
+        delivery: { type: string, enum: [pending, delivered, failed, none] }
+        attempts: { type: integer }
+        lastError: { type: [string, 'null'] }
+        deliveredAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+        result: { type: object, description: '{ cognisys, clinicianSummary, diagnostic }' }

@@ -1,0 +1,9 @@
+# Build context of the risk service (docker-compose.yml builds assistant/Dockerfile.risk from this folder):
+# send only what that image copies. The API is built from auzy-ai-v2/, which has its own .dockerignore.
+*
+!assistant/__init__.py
+!assistant/safety.py
+!assistant/risk_model.py
+!assistant/risk_server.py
+!assistant/models/risk-xlmr
+!assistant/models/risk-tfidf.joblib

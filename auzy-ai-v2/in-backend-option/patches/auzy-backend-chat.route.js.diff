@@ -1,0 +1,30 @@
+--- a/auzy-backend/src/routes/chat.route.js	2026-10-27 12:42:10.625131200 +0100
++++ b/auzy-backend/src/routes/chat.route.js	2026-10-27 12:42:10.625131200 +0100
+@@ -6,7 +6,6 @@
+ import { enqueueChatMessage } from '../queues/user_message.queue.js';
+ import { deductCredits, InsufficientCreditsError } from '../services/profile.service.js';
+ import { PERSONA1 } from '../enums/roles.enums.js';
+-import { maybeTriggerDiagnostic } from '../lib/claude/diagnostic.service.js';
+ 
+ const CHAT_MESSAGE_CREDIT_COST = 1;
+ 
+@@ -77,15 +76,10 @@
+         }
+ 
+         const msg = await createMessage(conversationId, payload);
+-        enqueueChatMessage(msg);
+-
+-        // Right as a patient's credits run out, replace the eventual "insufficient
+-        // credits" dead end with a pre-diagnostic + a free consultation offer.
+-        // Fire-and-forget: this shouldn't slow down sending the message.
+-        if (creditsRemaining === 0) {
+-            maybeTriggerDiagnostic(req.profile._id, conversationId)
+-                .catch((e) => console.error('Failed to generate diagnostic:', e?.message));
+-        }
++        // AI v2: creditsRemaining travels with the message. At 0 the assistant writes a closing reply, then the
++        // end-of-conversation analysis produces the Cognisys update, the clinician summary and the pre-diagnostic
++        // with the free consultation offer (this replaces the direct maybeTriggerDiagnostic call).
++        enqueueChatMessage({ ...msg.toObject(), creditsRemaining });
+ 
+         return res.status(201).json({ message: msg, creditsRemaining });
+     } catch (err) {

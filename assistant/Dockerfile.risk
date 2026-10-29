@@ -1,0 +1,20 @@
+# auzy-risk: crisis phrases (4 languages) + the multilingual risk model, called by auzy-backend (AI v2).
+# Build from the project root (the folder that contains assistant/):
+#   docker build -f assistant/Dockerfile.risk -t auzy-risk .
+#   docker run -d --name auzy-risk --network <auzy network> auzy-risk
+# Internal network only: it has no authentication. Needs about 1.5 GB of RAM (XLM-R on CPU).
+# For a small server, set RISK_MODEL=tfidf (10 MB model, weaker on indirect wording and Arabic/Derja).
+# NOTE: not built or run here (no Docker on the build machine); test it on your infrastructure first.
+FROM python:3.12-slim
+
+WORKDIR /app
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
+ && pip install --no-cache-dir fastapi "uvicorn[standard]" scikit-learn joblib "transformers>=4.44" sentencepiece
+
+COPY assistant/__init__.py assistant/safety.py assistant/risk_model.py assistant/risk_server.py ./assistant/
+COPY assistant/models/risk-xlmr ./assistant/models/risk-xlmr
+COPY assistant/models/risk-tfidf.joblib ./assistant/models/risk-tfidf.joblib
+
+EXPOSE 8001
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health')"
+CMD ["python", "-m", "uvicorn", "assistant.risk_server:app", "--host", "0.0.0.0", "--port", "8001"]

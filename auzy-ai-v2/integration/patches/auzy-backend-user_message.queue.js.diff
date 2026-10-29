@@ -1,0 +1,26 @@
+--- a/auzy-backend/src/queues/user_message.queue.js
++++ b/auzy-backend/src/queues/user_message.queue.js
+@@ -1,6 +1,7 @@
+ import { consumeFromQueue, pushToQueue } from "../config/rabbit.config.js";
+ import { Message } from "../model/Message.js";
+ import "./completion_request.queue.js";
++import "./ai_v2.queue.js";
+ 
+ export const enqueueChatMessage = async (messageData) => {
+   if (!messageData || !messageData.conversation || !messageData.role || !messageData.content) {
+@@ -29,5 +30,15 @@
+     // ignore duplicate save attempts
+   }
+ 
++  // AI v2 test accounts: their own queue (queues/ai_v2.queue.js). System messages (the chat-language switch) need no
++  // reply of their own; they reach the assistant with the patient's next message.
++  if (messageData.aiV2) {
++    if (messageData.role !== "user") return;
++    return pushToQueue("ai_v2_request", {
++      conversation: messageData.conversation,
++      creditsRemaining: messageData.creditsRemaining ?? null,
++    });
++  }
++
+   return pushToQueue("completion_request", { conversation: messageData.conversation });
+ });

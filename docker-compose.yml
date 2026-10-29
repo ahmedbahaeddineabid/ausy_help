@@ -1,0 +1,29 @@
+# Auzy AI v2: the API (auzy-ai-v2/) and the risk service (assistant/). From this folder:
+#   cp .env.example .env        then fill it in (see README.md, "Transfer steps")
+#   docker compose up -d --build
+#   curl http://127.0.0.1:8080/v1/health
+# Only the API is published, on AI_API_BIND (a private address auzy-backend can reach). The risk service has no
+# authentication and stays on the compose network. Not run on the development machine (no Docker there).
+
+services:
+  auzy-ai-api:
+    build: ./auzy-ai-v2
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+      RISK_SERVICE_URL: http://auzy-risk:8001
+    ports:
+      - "${AI_API_BIND:-127.0.0.1}:${AI_API_PORT:-8080}:8080"
+    depends_on:
+      auzy-risk:
+        condition: service_healthy
+    restart: unless-stopped
+
+  auzy-risk:
+    build:
+      context: .
+      dockerfile: assistant/Dockerfile.risk
+    environment:
+      RISK_MODEL: ${RISK_MODEL:-xlmr}
+    restart: unless-stopped

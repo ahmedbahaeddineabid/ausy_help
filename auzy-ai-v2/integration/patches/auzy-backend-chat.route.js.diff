@@ -1,0 +1,28 @@
+--- a/auzy-backend/src/routes/chat.route.js
++++ b/auzy-backend/src/routes/chat.route.js
+@@ -7,6 +7,7 @@
+ import { deductCredits, InsufficientCreditsError } from '../services/profile.service.js';
+ import { PERSONA1 } from '../enums/roles.enums.js';
+ import { maybeTriggerDiagnostic } from '../lib/claude/diagnostic.service.js';
++import { useAiV2 } from '../lib/ai-v2/ai-v2.client.js';
+ 
+ const CHAT_MESSAGE_CREDIT_COST = 1;
+ 
+@@ -77,12 +78,15 @@
+         }
+ 
+         const msg = await createMessage(conversationId, payload);
+-        enqueueChatMessage(msg);
++        // AI v2 test accounts (AI_V2_TEST_PROFILES): the message goes to the Auzy AI API with the credit balance;
++        // at 0 credits the pre-diagnostic comes from its end-of-conversation analysis instead of maybeTriggerDiagnostic.
++        const aiV2 = useAiV2(req.profile._id);
++        enqueueChatMessage(aiV2 ? { ...msg.toObject(), creditsRemaining: creditsRemaining ?? null, aiV2: true } : msg);
+ 
+         // Right as a patient's credits run out, replace the eventual "insufficient
+         // credits" dead end with a pre-diagnostic + a free consultation offer.
+         // Fire-and-forget: this shouldn't slow down sending the message.
+-        if (creditsRemaining === 0) {
++        if (creditsRemaining === 0 && !aiV2) {
+             maybeTriggerDiagnostic(req.profile._id, conversationId)
+                 .catch((e) => console.error('Failed to generate diagnostic:', e?.message));
+         }

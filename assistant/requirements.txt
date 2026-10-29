@@ -1,0 +1,12 @@
+anthropic>=1.15
+fastapi
+uvicorn[standard]
+pandas
+scikit-learn
+joblib
+# XLM-R risk model. On a CUDA GPU install torch from https://download.pytorch.org/whl/cu126;
+# a CPU-only server can use the default torch wheel, or set RISK_MODEL=tfidf and skip these.
+torch
+transformers>=4.44
+accelerate
+sentencepiece

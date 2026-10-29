@@ -1,0 +1,21 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# dependencies and caches
+node_modules/
+__pycache__/
+*.pyc
+*.log
+
+# trained models: shipped separately (auzy-risk-model-xlmr.zip)
+assistant/models/risk-xlmr/
+assistant/models/risk-tfidf.joblib
+
+# runtime and test output
+assistant/data/escalations.jsonl
+auzy-ai-v2/test/.kit-sandbox/
+
+# downloaded public datasets (re-downloaded by mh_dataset/scripts)
+mh_dataset/data/external/

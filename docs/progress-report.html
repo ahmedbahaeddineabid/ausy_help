@@ -1,0 +1,529 @@
+<title>Auzy AI v2 Progress</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one report column (about 72 characters wide) with a sticky contents rail on wide screens;
+   tables and the diagram scroll inside their own frames on phones. */
+:root {
+  --bg: #F4F7F6;
+  --surface: #FFFFFF;
+  --ink: #16252A;
+  --muted: #55676B;
+  --rule: #D7E0DE;
+  --accent: #0D6A63;
+  --accent-soft: #E1F0EE;
+  --ok: #2C6A30;
+  --ok-soft: #E5F1E3;
+  --warn: #8F560C;
+  --warn-soft: #FAEFDC;
+  --crit: #A3271C;
+  --crit-soft: #FAE7E5;
+  --font-display: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-body: "IBM Plex Sans", "IBM Plex Sans Arabic", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1617; --surface: #142022; --ink: #E3ECEA; --muted: #9AAFAC; --rule: #29383A;
+    --accent: #5DB9AF; --accent-soft: #15302D; --ok: #8DCB8B; --ok-soft: #182A19;
+    --warn: #E4AA5B; --warn-soft: #2D2314; --crit: #F28D83; --crit-soft: #321918;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1617; --surface: #142022; --ink: #E3ECEA; --muted: #9AAFAC; --rule: #29383A;
+  --accent: #5DB9AF; --accent-soft: #15302D; --ok: #8DCB8B; --ok-soft: #182A19;
+  --warn: #E4AA5B; --warn-soft: #2D2314; --crit: #F28D83; --crit-soft: #321918;
+  color-scheme: dark;
+}
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.62;
+}
+.page {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding-block: 40px 96px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 56px;
+}
+.toc {
+  position: sticky;
+  top: calc(28px + env(safe-area-inset-top, 0px));
+  align-self: start;
+  font-size: 14px;
+}
+.toc p { margin: 0 0 10px; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.toc a { color: var(--muted); text-decoration: none; }
+.toc a:hover { color: var(--accent); text-decoration: underline; }
+article { min-width: 0; max-width: 74ch; }
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0;
+}
+h1, h2 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.1rem, 4.5vw, 3rem); line-height: 1.08; margin: 8px 0 12px; }
+h2 { font-size: 1.65rem; line-height: 1.2; margin: 56px 0 14px; padding-top: 22px; border-top: 1px solid var(--rule); }
+h3 { font-size: 1.05rem; font-weight: 600; margin: 32px 0 8px; }
+p { margin: 0 0 14px; }
+.lede { font-size: 1.12rem; color: var(--ink); max-width: 64ch; }
+.meta { color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 4px 0 26px; }
+.figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: 12px; margin: 0 0 8px; }
+.figure { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.figure .label { font-size: 13px; color: var(--muted); }
+.figure .value { font-family: var(--font-mono); font-size: 1.35rem; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.figure .sub { font-size: 13px; color: var(--muted); }
+ul, ol { padding-left: 1.35rem; margin: 0 0 16px; }
+li + li { margin-top: 6px; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); margin: 8px 0 18px; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; line-height: 1.5; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-size: 12.5px; font-weight: 600; color: var(--muted); letter-spacing: 0.02em; background: var(--accent-soft); }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+tr.total td { font-weight: 600; }
+.caption { font-size: 13px; color: var(--muted); margin: -8px 0 18px; }
+code { font-family: var(--font-mono); font-size: 0.88em; background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+.pill { display: inline-block; font-family: var(--font-mono); font-size: 12px; padding: 1px 9px; border-radius: 999px; white-space: nowrap; }
+.pill.done { background: var(--ok-soft); color: var(--ok); }
+.pill.todo { background: var(--warn-soft); color: var(--warn); }
+.pill.block { background: var(--crit-soft); color: var(--crit); }
+.callout { border: 1px solid var(--rule); background: var(--surface); border-radius: 8px; padding: 14px 16px; margin: 12px 0 18px; }
+.callout .tag { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 6px; }
+.callout.safety { border-color: color-mix(in srgb, var(--crit) 40%, var(--rule)); }
+.callout.safety .tag { color: var(--crit); }
+.callout.info .tag { color: var(--accent); }
+.callout p:last-child, .callout ul:last-child { margin-bottom: 0; }
+.quote { font-style: italic; }
+[lang="ar"] { font-family: "IBM Plex Sans Arabic", var(--font-body); font-style: normal; }
+.question { border: 1px solid var(--rule); background: var(--surface); border-radius: 8px; padding: 14px 16px; }
+.questions { display: grid; gap: 12px; margin: 10px 0 18px; }
+.question h3 { margin: 0 0 6px; font-size: 1rem; }
+.question p { margin: 0 0 6px; font-size: 15px; }
+.question .rec { color: var(--accent); font-size: 14.5px; margin: 0; }
+.diagram { border: 1px solid var(--rule); background: var(--surface); border-radius: 8px; padding: 14px; overflow-x: auto; margin: 8px 0 18px; }
+.checklist { list-style: none; padding: 0; }
+.checklist li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: baseline; }
+.foot { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--rule); color: var(--muted); font-size: 13.5px; }
+@media (max-width: 880px) {
+  .page { grid-template-columns: minmax(0, 1fr); gap: 20px; padding-block: 28px 72px; }
+  .toc { position: static; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); padding: 12px 14px; }
+  .toc ol { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  h2 { margin-top: 44px; }
+}
+</style>
+
+<div class="page">
+  <nav class="toc" aria-label="Contents">
+    <p class="eyebrow">Contents</p>
+    <ol>
+      <li><a href="#summary">Summary</a></li>
+      <li><a href="#starting-point">Where we started</a></li>
+      <li><a href="#risk-detection">Risk detection</a></li>
+      <li><a href="#prototype">Prototype lessons</a></li>
+      <li><a href="#engine">The v2 engine</a></li>
+      <li><a href="#budget">Budget controls</a></li>
+      <li><a href="#costs">Costs</a></li>
+      <li><a href="#quality">Quality in live tests</a></li>
+      <li><a href="#testing">Test status</a></li>
+      <li><a href="#decisions">Decisions so far</a></li>
+      <li><a href="#questions">Questions for the team</a></li>
+      <li><a href="#go-live">Before go-live</a></li>
+      <li><a href="#next-steps">Next steps</a></li>
+      <li><a href="#files">Where things are</a></li>
+    </ol>
+  </nav>
+
+  <article>
+    <p class="eyebrow">Progress report · updated 29 October 2026</p>
+    <h1>Auzy AI v2</h1>
+    <p class="lede">The new engine behind the Auzy patient chat: what we built, what it costs, how it was tested, and what the team needs to decide next.</p>
+    <div class="meta">
+      <span>Status: delivered as an API for testing inside Auzy with test accounts; not yet run inside Auzy</span>
+      <span>Languages: English, French, Arabic, Tunisian Derja</span>
+    </div>
+
+    <div class="figures" id="summary">
+      <div class="figure"><span class="label">Cost per conversation today</span><span class="value">$1.58</span><span class="sub">Claude Opus 4.8 for every call</span></div>
+      <div class="figure"><span class="label">v2, measured</span><span class="value">0.4–9.4¢</span><span class="sub">routine English to 10-message Derja</span></div>
+      <div class="figure"><span class="label">Target per 1,000 conversations</span><span class="value">$50–80</span><span class="sub">held by the budget governor (today ~$1,580)</span></div>
+      <div class="figure"><span class="label">Test budget used</span><span class="value">$1.08 / $3</span><span class="sub">data, prototype and live tests</span></div>
+    </div>
+
+    <h2>Summary</h2>
+    <ul>
+      <li>The current chat sends every call to Claude Opus 4.8 and costs about <strong>$1.58 per conversation</strong>. 85% of that is Cognisys, which re-analyses the patient after almost every reply.</li>
+      <li>The current chat has <strong>no safety handling</strong>: no crisis detection, no emergency information for the patient, no alert to the care team.</li>
+      <li><strong>Auzy AI v2</strong> keeps everything patients and clinicians use today and changes how Claude is called underneath: safety checks in four languages, the cheaper model for routine messages, prompt caching, and one analysis per conversation instead of one per reply.</li>
+      <li>Measured with real calls: a routine English conversation costs about <strong>0.4–1.5¢</strong>, a 10-message Derja conversation <strong>9.4¢</strong>, a short crisis conversation <strong>6.2¢</strong>.</li>
+      <li>A budget governor keeps the average at <strong>$50–80 per 1,000 conversations</strong> whatever the mix of languages, and never limits crisis handling.</li>
+      <li>It is delivered as an <strong>API that auzy-backend calls</strong>. Only the profiles listed as test accounts use it; everyone else keeps today's chat, and one setting switches it off.</li>
+      <li>Tested: 81 automated tests and a full local run with the real processes (API, MongoDB, risk service), plus 3 live runs of the engine with real Claude calls. Not yet run inside Auzy. The Arabic and Derja material still needs review by native-speaker clinicians.</li>
+    </ul>
+
+    <h2 id="starting-point">Where we started</h2>
+    <p>The export of the live chat code (backend commit eb8e5fe, frontend 7cac590) includes a cost measurement made on 27 October with Anthropic's token counter, on real conversation data:</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Part of a conversation</th><th class="num">Cost</th><th class="num">Share</th></tr></thead>
+        <tbody>
+          <tr><td>Cognisys profile analysis, after almost every reply (~15,000 tokens in, ~2,400 out each time)</td><td class="num">$1.35</td><td class="num">85%</td></tr>
+          <tr><td>10 chat replies (persona prompt and tools re-sent in full each time, no caching)</td><td class="num">$0.15</td><td class="num">9%</td></tr>
+          <tr><td>Professional search (returns ~8,300 tokens for 10 profiles)</td><td class="num">$0.06</td><td class="num">4%</td></tr>
+          <tr><td>Pre-diagnostic at 0 credits</td><td class="num">$0.02</td><td class="num">1%</td></tr>
+          <tr class="total"><td>Total per conversation</td><td class="num">$1.58</td><td class="num">100%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Other findings in the live code:</p>
+    <ul>
+      <li>Cognisys waits only 10 seconds between runs (<code>COOLDOWN_SECONDS = 10</code>), while a comment says 5 minutes. That is why it runs after almost every reply.</li>
+      <li>The Cognisys schema leaves out <code>confidence</code>, <code>source</code>, <code>unit</code> and dimension <code>factors</code>, so those fields are always empty.</li>
+      <li>The chat-language switch merges a hidden instruction into the main prompt, which resets the cache.</li>
+      <li>Only the last 10 messages are sent to Claude, a window that shifts every turn and so can never be cached.</li>
+      <li>When a reply shows professional cards, the reply text is replaced by a fixed sentence. That could erase a safety message.</li>
+    </ul>
+
+    <h2 id="risk-detection">What we built: risk detection</h2>
+    <p>Every patient message is checked on our own server before Claude sees it. These checks cost nothing per message and take about 26 ms.</p>
+
+    <h3>Training data</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Source</th><th class="num">Rows</th><th>How it was used</th></tr></thead>
+        <tbody>
+          <tr><td>Reddit posts from mental-health communities (existing file)</td><td class="num">12,456</td><td>Labelled by keyword rules; 3,996 used after cleaning</td></tr>
+          <tr><td>Emotion dataset (existing files)</td><td class="num">20,000</td><td>Joy, love and surprise used as "normal" examples</td></tr>
+          <tr><td>GoEmotions, Reddit comments (Apache 2.0)</td><td class="num">54,000</td><td>Neutral and positive comments as "normal" examples</td></tr>
+          <tr><td>MentalChat16K (MIT)</td><td class="num">16,000</td><td>Extra context only; no labels</td></tr>
+          <tr><td>Messages generated with Claude Haiku and checked by a second, blind call</td><td class="num">13,182</td><td>8 states in English (5,039), French (4,962) and Arabic (3,179)</td></tr>
+          <tr><td>Derja messages generated the same way</td><td class="num">6,333</td><td>Not used yet: a 400-message sample is ready for native review</td></tr>
+          <tr><td>Hand-written screening conversations (existing)</td><td class="num">16</td><td>Kept apart as a test set in all four languages</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>The risk model</h3>
+    <p>A multilingual language model (XLM-R) fine-tuned on that data. It reads each message and scores 8 states: normal, anxiety, depression, suicidal, self-harm, trauma, stress, loneliness or grief. It runs on an ordinary server CPU.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Test</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>Real messages: risk messages caught / alerts that were right</td><td>98.4% / 88.4%</td></tr>
+          <tr><td>Generated messages: risk caught by language</td><td>English 98%, French 100%, Arabic 96%</td></tr>
+          <tr><td>Hard cases in four languages (model and phrase lists together)</td><td>12 of 12</td></tr>
+          <tr><td>Hand-written conversations (model and phrase lists together)</td><td>14 of 16: every risk case caught; 2 false alarms on formal Arabic</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Crisis phrase lists</h3>
+    <p>Phrase lists in English, French, Arabic and Derja catch explicit statements about suicide, self-harm, harming someone else and abuse. Derja spellings are normalised first, so <span class="quote">n7eb nmout</span>, <span class="quote">nheb nmout</span> and <span class="quote">N7ebb nemout</span> all match. Everyday phrases that look similar, such as <span lang="ar" dir="rtl">ضربني البرد</span> ("I caught a cold"), are tested and do not trigger.</p>
+    <p>The lists and the model run together in a small Python service, <strong>auzy-risk</strong>. Long messages are scored in pieces so a risk sentence at the end is not cut off.</p>
+    <div class="callout info">
+      <p class="tag">Known limits</p>
+      <ul>
+        <li>The model never saw reviewed Derja data, so for Derja it relies mostly on the phrase lists.</li>
+        <li>It wrongly flags some ordinary messages, for example "I had something similar two years ago after my exams" (score 0.87). In v2 that only triggers a second opinion from Sonnet, never an alert.</li>
+      </ul>
+    </div>
+
+    <h2 id="prototype">What the Python prototype taught us</h2>
+    <p>Before building v2 we tested the design as a standalone Python assistant with real Claude calls. Each problem we found became a rule in v2.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>What went wrong in testing</th><th>Rule in v2</th></tr></thead>
+        <tbody>
+          <tr><td>The risk model alone escalated an ordinary message and alerted the care team</td><td>A model signal alone only triggers a second opinion from Sonnet; an alert needs Sonnet's confirmation</td></tr>
+          <tr><td>Haiku flagged "I feel useless" as suicidal because it had just asked the safety question</td><td>Haiku's own risk flag is re-checked by Sonnet on the same message before anyone is alerted; the prompt says asking a safety question is not a sign of risk</td></tr>
+          <tr><td>A clinician summary was cut off and lost</td><td>Larger output limit, and a failed summary is retried once on Sonnet</td></tr>
+          <tr><td>Haiku misread Derja in summaries ("I can't take it anymore" became "can't sleep")</td><td>Sonnet writes every summary of an Arabic or Derja conversation</td></tr>
+          <tr><td>Arabic letters appeared inside Latin-script Derja words</td><td>Mixed words are converted to Arabizi before the patient sees them</td></tr>
+          <tr><td>The emergency banner stayed in English after a patient switched to Derja</td><td>The banner follows the patient's current language</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="engine">What we built: the v2 engine</h2>
+    <p>A Node service, the Auzy AI API, which auzy-backend calls for each patient message, plus the auzy-risk service. What patients and clinicians see stays the same:</p>
+    <ul>
+      <li>personas (the consultant's assistant, or the platform default)</li>
+      <li>professional, appointment and test cards</li>
+      <li>credits: 1 per message, the same rule for every patient</li>
+      <li>the pre-diagnostic with a free consultation offer at 0 credits</li>
+      <li>Cognisys profiles, the master's library, Socket.IO and the chat language switcher</li>
+    </ul>
+
+    <h3>How one message is handled</h3>
+    <div class="diagram">
+<pre class="mermaid">
+flowchart TD
+  A["Patient message (credit deducted as today)"] --> B["auzy-risk: crisis phrases + risk model"]
+  B -->|crisis phrase| E["Escalate now: alert care team, emergency banner"]
+  B -->|risk model only| S2["Sonnet answers as a second opinion"]
+  B -->|no signal| L{"Language and quality level"}
+  L -->|Arabic or Derja| S3["Sonnet reply, low effort"]
+  L -->|English or French| H["Haiku reply, low effort"]
+  H -->|Haiku flags risk| S2
+  S2 -->|Sonnet confirms risk| E
+  E --> S["Sonnet reply, medium effort, for the rest of the conversation"]
+  E --> U["Urgent clinician summary"]
+  S --> R["Reply and cards to the patient"]
+  S2 --> R
+  S3 --> R
+  H --> R
+  R --> X{"Credits now 0, or 30 minutes idle?"}
+  X -->|yes| Z["One analysis: Cognisys + clinician summary + pre-diagnostic"]
+</pre>
+    </div>
+
+    <h3>Safety rules</h3>
+    <ul>
+      <li>Risks covered: suicidal thoughts (including indirect ones), self-harm, harming someone else, abuse or violence, other acute crises.</li>
+      <li>An explicit crisis phrase escalates at once. Every other signal needs Sonnet's confirmation on the same message.</li>
+      <li>Escalation means: an alert to the care team (webhook), an emergency banner with 190 (SAMU) in the patient's language, Sonnet for every later reply, and an urgent clinician summary.</li>
+      <li>An escalation stays active until a clinician clears it. The care team is alerted once per conversation.</li>
+      <li>If Claude declines to answer, the patient still gets the emergency text and the team is alerted.</li>
+      <li>Claude never discusses methods of suicide, self-harm or violence, never names a diagnosis and never gives medication advice.</li>
+    </ul>
+
+    <h3>End of a conversation</h3>
+    <p>When credits reach 0, or after 30 minutes without a message, one call produces three things that used to need three separate jobs:</p>
+    <ul>
+      <li><strong>Cognisys update</strong>: facts (now with confidence and source filled in), dimensions and the profile summary.</li>
+      <li><strong>Clinician summary</strong> in French: concerns, symptoms with duration, sleep, appetite, functioning, history, risk and protective factors, suggested questionnaire, consultation status, and a short narrative. Urgent only when the patient's own words show risk.</li>
+      <li><strong>Pre-diagnostic</strong> for the patient (at 0 credits, if eligible) with the free consultation offer.</li>
+    </ul>
+    <p>The next conversation starts fresh, carrying the profile summary and the last few messages so the assistant keeps the context.</p>
+
+    <h3>How it plugs into Auzy</h3>
+    <ul>
+      <li>auzy-backend sends a patient's messages to the API only if the profile is on the test list. Everyone else keeps today's chat. If the API can't be reached, today's chat answers.</li>
+      <li>auzy-backend gets five new files: a queue consumer, a small client, and internal routes for the three lookups, the Cognisys read and the delivery of each analysis. It also gets two small patches (the chat route and the user-message queue). No existing file is replaced.</li>
+      <li>The frontend gets one patch: the emergency banner stays visible while a conversation is escalated.</li>
+      <li>The API keeps its own database on Auzy's MongoDB. It never touches Auzy's data: lookups and saves go through auzy-backend with a shared secret.</li>
+      <li>The auzy-risk service runs as a separate container on the internal network (about 1.5 GB of RAM).</li>
+      <li>Staff endpoints: clinician summaries, a conversation's state, clearing an escalation, and a cost report.</li>
+      <li>Rollback: one setting in auzy-backend (<code>AI_V2_ENABLED=false</code>).</li>
+    </ul>
+
+    <h2 id="budget">Budget controls</h2>
+    <p>The goal set on 27 October: <strong>$50–80 per 1,000 conversations</strong>. A conversation here is one sitting: from the first message until credits run out or 30 minutes of silence.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Quality level</th><th>Who writes routine replies</th><th>Cost per 10-message conversation</th></tr></thead>
+        <tbody>
+          <tr><td>Economy</td><td>Haiku for everyone</td><td>English/French 0.3–1.5¢; Arabic/Derja about 4.6¢</td></tr>
+          <tr><td>Standard (starting level)</td><td>Sonnet for Arabic/Derja, Haiku for English/French</td><td>English/French 0.3–1.5¢; Arabic/Derja 9.4¢ (measured)</td></tr>
+          <tr><td>Premium</td><td>Sonnet for everyone</td><td>English/French about 5.3¢; Arabic/Derja 9.4¢</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul>
+      <li><strong>Budget governor.</strong> Once a day it reads the real average cost of the last 7 days from the cost ledger. Above $80 per 1,000 it moves one level cheaper at once; below $50 it moves one level better, at most once every 3 days. Nothing changes before 50 finished conversations.</li>
+      <li><strong>15¢ ceiling per conversation.</strong> Past it, routine replies and the analysis switch to Haiku.</li>
+    </ul>
+    <div class="callout safety">
+      <p class="tag">Safety comes first</p>
+      <p>The ceiling and the governor never touch crisis handling. Second opinions, escalated conversations and urgent summaries always use Sonnet, even past 15¢. This default needs the team's confirmation (see the questions below).</p>
+    </div>
+
+    <h2 id="costs">Costs</h2>
+    <h3>Measured with real calls</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Conversation</th><th class="num">Messages</th><th class="num">Cost</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>English, routine</td><td class="num">6</td><td class="num">1.46¢</td><td>Includes one Sonnet second opinion (1.2¢). Without it, about 0.25¢.</td></tr>
+          <tr><td>Derja, abuse disclosed</td><td class="num">3</td><td class="num">6.18¢</td><td>Alert, Sonnet replies, urgent summary (1.6¢), Sonnet analysis (3.5¢)</td></tr>
+          <tr><td>Derja, routine, standard level</td><td class="num">10</td><td class="num">9.36¢</td><td>Sonnet replies 5.1¢ (11 calls), Sonnet analysis 4.3¢</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="caption">Replies took 1.3–3.3 seconds on Haiku and 3–7 seconds on Sonnet. These runs started with an empty cache; at steady traffic the shared prompt is usually cached, saving about 0.7¢ per conversation.</p>
+
+    <h3>Per 1,000 conversations</h3>
+    <p>Projected from the measured costs, assuming 10% of conversations involve a crisis:</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Share of patients writing Arabic or Derja</th><th class="num">At the starting level</th><th class="num">After the governor adjusts</th></tr></thead>
+        <tbody>
+          <tr><td>85%</td><td class="num">~$91</td><td class="num">~$51 (Derja replies on Haiku)</td></tr>
+          <tr><td>60%</td><td class="num">~$70</td><td class="num">~$70</td></tr>
+          <tr><td>30%</td><td class="num">~$45</td><td class="num">~$71 (Sonnet for everyone)</td></tr>
+          <tr><td>0%</td><td class="num">~$19</td><td class="num">~$58 (Sonnet for everyone)</td></tr>
+          <tr class="total"><td>Today's chat, for comparison</td><td class="num">$1,580</td><td class="num"></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Crisis handling sets the floor: at 10% crisis conversations it costs about $11 per 1,000 on its own, and it is never reduced.</p>
+
+    <h3>Spent on this project</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>What</th><th class="num">Cost</th></tr></thead>
+        <tbody>
+          <tr><td>Generating the multilingual training messages</td><td class="num">$0.67</td></tr>
+          <tr><td>Live tests of the Python prototype</td><td class="num">$0.24</td></tr>
+          <tr><td>Live tests of the v2 engine, including the Derja measurement</td><td class="num">$0.17</td></tr>
+          <tr class="total"><td>Total, out of a $3 test budget</td><td class="num">$1.08</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="quality">Quality in the live tests</h2>
+    <h3>What worked</h3>
+    <ul>
+      <li>The first reply tells the patient that the conversation is summarized for the care team.</li>
+      <li>Asked about a test, the assistant showed the PHQ-9 card; asked for a professional, it showed professional cards with a short introduction.</li>
+      <li>The risk model's false signal produced a calm reply and no alert.</li>
+      <li>For the Derja abuse message (<span class="quote">Rajli yadhrabni kol lila</span>), the team was alerted at once. The reply asked whether she was safe and whether her husband was nearby, gave 190, and suggested reaching a trusted person. The urgent summary noted that her safety at home was unknown.</li>
+      <li>In the 10-message Derja conversation, "I feel worthless" led to a gentle safety question and no false alarm. The patient's denial was respected, and the closing reply mentioned the pre-assessment and the free 15-minute consultation.</li>
+    </ul>
+    <h3>Fixed after the live tests</h3>
+    <ul>
+      <li>Arabic letters inside Latin-script Derja words, and whole Arabic words inside a Latin-script reply, are now converted to Arabizi.</li>
+      <li>The closing reply at 0 credits now always mentions the pre-assessment and the free consultation.</li>
+      <li>Short Derja messages written with few numerals were not recognised as Derja.</li>
+    </ul>
+    <h3>Still open</h3>
+    <ul>
+      <li>A summary translated <span class="quote">3amin</span> (two years) as "one year". Derja summaries need native review.</li>
+      <li>The pre-diagnostic for a Derja-speaking patient came out in French.</li>
+      <li>Some Derja wording in replies is unusual (for example <span class="quote">moh'adtha</span> for "conversation").</li>
+    </ul>
+
+    <h2 id="testing">Test status</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Check</th><th>Status</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr><td>Automated tests, with stand-ins for Claude, the database and auzy-backend</td><td><span class="pill done">81 pass</span></td><td>Engine (routing, safety, cards, credits, sessions, analysis, budget), HTTP API (keys, validation, every endpoint, retries, idle analysis), and the auzy-backend kit end to end</td></tr>
+          <tr><td>MongoDB storage, against a real MongoDB</td><td><span class="pill done">9 / 9</span></td><td>Sessions, summaries, cost ledger, analyses and their delivery, indexes</td></tr>
+          <tr><td>Full local run: API process, MongoDB, auzy-risk; stand-ins for Claude and auzy-backend</td><td><span class="pill done">9 / 9</span></td><td>Crisis → escalation and alert, cards, analysis delivered, state kept across a restart, risk service down</td></tr>
+          <tr><td>auzy-risk service tests, real model</td><td><span class="pill done">8 pass</span></td><td>Derja and Arabic phrases, indirect risk, a risk sentence at the end of an 8,000-character message</td></tr>
+          <tr><td>Engine and auzy-risk together over HTTP</td><td><span class="pill done">pass</span></td><td>All routing paths, 31 ms per check</td></tr>
+          <tr><td>Live runs with real Claude calls</td><td><span class="pill done">3 runs</span></td><td>Engine, 27 October: every request format accepted; caching works from the second message. Not yet repeated through the API.</td></tr>
+          <tr><td>Inside the real auzy-backend</td><td><span class="pill todo">not started</span></td><td>The kit was run against stand-ins of auzy-backend's modules; the patches apply to the exported files</td></tr>
+          <tr><td>Container images (API and auzy-risk)</td><td><span class="pill todo">not built</span></td><td>No Docker on the development machine; to be built on Auzy's server</td></tr>
+          <tr><td>Clinical review of Arabic and Derja material</td><td><span class="pill block">required</span></td><td>Needed before any real patient uses v2</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="decisions">Decisions made so far</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Topic</th><th>Decision</th></tr></thead>
+        <tbody>
+          <tr><td>Where the engine lives</td><td>A separate API that auzy-backend calls, with the risk model as a small Python service; test accounts first</td></tr>
+          <tr><td>Auzy's data</td><td>Read and saved through auzy-backend's own services (internal routes with a shared secret); the API has its own database on Auzy's MongoDB</td></tr>
+          <tr><td>Hand-over</td><td>Zip and git repository; the 1.1 GB model in a separate archive; training pipeline included</td></tr>
+          <tr><td>End of conversation</td><td>One combined analysis: Cognisys update, clinician summary, pre-diagnostic</td></tr>
+          <tr><td>Credits</td><td>Same rule for every patient, including during a crisis; the emergency banner stays visible</td></tr>
+          <tr><td>Build order</td><td>Standalone first, then the API for testing inside Auzy</td></tr>
+          <tr><td>Harming others and abuse</td><td>Escalated exactly like suicidal thoughts</td></tr>
+          <tr><td>Clinician summaries</td><td>Haiku for English and French; Sonnet for Arabic, Derja and urgent cases; written in French</td></tr>
+          <tr><td>Signals from a single source</td><td>The risk model alone, or Haiku alone, never alerts the team without Sonnet's confirmation</td></tr>
+          <tr><td>Budget</td><td>$50–80 per 1,000 conversations, held by the daily governor</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="questions">Questions for the team</h2>
+    <div class="questions">
+      <div class="question">
+        <h3>What share of patients write in Arabic or Derja?</h3>
+        <p>This decides the quality level the budget allows. Above about 70%, the budget pushes Derja replies back to Haiku.</p>
+      </div>
+      <div class="question">
+        <h3>Should the end-of-conversation analysis be made cheaper?</h3>
+        <p>It is 4.3¢ of the 9.4¢ in a Derja conversation. Sonnet with less thinking and a shorter output should bring a Derja conversation to about 8¢, keeping Derja replies on Sonnet even with a mostly Derja user base.</p>
+        <p class="rec">Recommended, after one more measurement (about $0.05) to check summary quality.</p>
+      </div>
+      <div class="question">
+        <h3>Which language should a Derja speaker's pre-diagnostic use?</h3>
+        <p>It currently comes out in French. Options: French, or Derja in the script the patient used.</p>
+      </div>
+      <div class="question">
+        <h3>Do we confirm that safety comes before the 15¢ ceiling?</h3>
+        <p>Today a person in crisis keeps Sonnet, the alert and the urgent summary even past 15¢. The alternative is a strict 15¢ for every conversation.</p>
+        <p class="rec">Recommended: keep safety first.</p>
+      </div>
+      <div class="question">
+        <h3>Should the assistant learn from real conversations?</h3>
+        <p>With patient consent and a few minutes of clinician feedback a day, a weekly job could improve the risk model and Haiku's Derja, so Derja conversations could cost about half. Each upgrade would ship only if it catches at least as many people at risk.</p>
+        <p class="rec">Suggested first step: a consent checkbox, clinician feedback screens and a Derja glossary.</p>
+      </div>
+      <div class="question">
+        <h3>Who may read clinician summaries?</h3>
+        <p>The staff views need a separate staff token, and nobody has it by default. Who should hold it, and should consultants later see only their own patients?</p>
+      </div>
+      <div class="question">
+        <h3>How should escalations reach the care team?</h3>
+        <p>Today: a webhook to a channel the team watches. An in-app notification for the assigned consultant needs a new notification type.</p>
+      </div>
+      <div class="question">
+        <h3>Which emergency numbers should patients see?</h3>
+        <p>190 (SAMU) is configured. Abuse cases may also need a police or violence-support number; the clinical team should confirm which.</p>
+      </div>
+    </div>
+
+    <h2 id="go-live">Before real patients use it</h2>
+    <ul class="checklist">
+      <li><span class="pill block">clinical</span><span>Native-speaker clinicians review the Arabic and Derja crisis phrases, the emergency texts, the assistant's instructions and the summary rules.</span></li>
+      <li><span class="pill block">clinical</span><span>Review the 400-message Derja sample, then retrain the risk model with it.</span></li>
+      <li><span class="pill block">legal</span><span>Consent wording, data retention, and INPDP authorisation for processing health data.</span></li>
+      <li><span class="pill block">operations</span><span>A named person on call for escalations, and the escalation webhook pointed at a channel they watch.</span></li>
+      <li><span class="pill todo">technical</span><span>Check the tool field lists against the real Profile, Appointment and test models.</span></li>
+      <li><span class="pill todo">technical</span><span>Compare v2 replies with today's Opus replies on consented test conversations.</span></li>
+      <li><span class="pill todo">technical</span><span>Decide who holds the staff token for summaries and costs.</span></li>
+      <li><span class="pill todo">technical</span><span>Build both container images on Auzy's server and run the API as a single instance (its lock and scheduler are in-process).</span></li>
+      <li><span class="pill block">security</span><span>Replace the Anthropic API key used during testing: it was shared in a chat session.</span></li>
+    </ul>
+
+    <h2 id="next-steps">Next steps</h2>
+    <ol>
+      <li>Install the API and auzy-risk on a test server, following the transfer steps in the package README, and check <code>/v1/health</code>.</li>
+      <li>Add the kit to auzy-backend, list the test accounts, and chat in each language using the checklist in <code>auzy-ai-v2/README.md</code>.</li>
+      <li>Clinical review of the Arabic and Derja material, the Derja sample and the summary rules; retrain the risk model.</li>
+      <li>Compare reply quality with the current chat on consented test conversations, then widen the test list.</li>
+      <li>Go live with the cost report (<code>/v1/costs</code>) and the escalation channel monitored from day one.</li>
+      <li>If agreed, start the learning loop: consent, clinician feedback, weekly upgrades with a safety check.</li>
+    </ol>
+
+    <h2 id="files">Where things are</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Folder</th><th>Contents</th></tr></thead>
+        <tbody>
+          <tr><td><code>README.md</code>, <code>docker-compose.yml</code>, <code>.env.example</code></td><td>Transfer steps and deployment of the API and auzy-risk</td></tr>
+          <tr><td><code>auzy-ai-v2/</code></td><td>The API (server, engine, tests, OpenAPI spec), the auzy-backend kit and patches (<code>integration/</code>), and the developer reference (README)</td></tr>
+          <tr><td><code>assistant/</code></td><td>The auzy-risk service and its Dockerfile, crisis phrase lists, risk model training, training-data generation</td></tr>
+          <tr><td><code>assistant/models/</code></td><td>The trained risk models (XLM-R, about 1.1 GB, and a lighter backup), shipped as a separate archive</td></tr>
+          <tr><td><code>assistant/data/</code></td><td>Generated training messages, the Derja review sample, the spending ledger</td></tr>
+          <tr><td><code>mh_dataset/</code></td><td>The original PHQ-9/GAD-7 screening dataset pipeline and the merged datasets</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="foot">Costs are in US dollars at Anthropic's published prices for Claude Haiku 5.5 and Claude Sonnet 5.5. Figures marked "measured" come from real calls on 27 October 2026; per-1,000 figures are projections from them.</p>
+  </article>
+</div>
