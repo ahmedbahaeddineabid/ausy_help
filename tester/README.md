@@ -6,7 +6,7 @@ Streamlit Community Cloud for testers who have nothing installed.
 
 | Tab | What it shows |
 |---|---|
-| Chat | Replies and cards; the emergency banner while a conversation is escalated; the model and cost of each reply; sample messages in four languages; buttons to end the conversation now and to clear an escalation |
+| Chat | The greeting that opens the conversation; replies and cards; the emergency banner while a conversation is escalated; the model and cost of each reply; sample messages in four languages; buttons to end the conversation now and to clear an escalation |
 | Conversation | The escalation state; the screening signal of each message; the clinician summaries; the end-of-conversation analyses (pre-diagnostic, Cognisys update) and whether they reached auzy-backend |
 | Summaries | Every clinician summary, urgent first |
 | Costs | Spend; cost per 1,000 finished conversations; budget level; cost by kind of call and by model |
@@ -15,7 +15,8 @@ The sidebar sets up the test patient:
 - **Credits:** one per message. The message that brings them to 0 gets the closing reply and starts the analysis.
 - **Free consultation:** whether the patient is eligible.
 - **Persona:** the sample persona, a custom one, or none.
-- **Chat language:** simulates the chat-language switch.
+- **Chat language:** the greeting's language, until the patient writes. Changed after that, it reaches the assistant
+  with the next message, like Auzy's chat-language menu.
 
 ## On one machine (no Auzy, no MongoDB)
 
@@ -103,12 +104,15 @@ Keep it safe:
 ## Check
 
 `python tester/test_app.py` drives the page like a user (Streamlit AppTest). The stand-in answers instead of Claude,
-so it costs nothing. It runs 25 checks.
+so it costs nothing. It runs 30 checks.
 
 Against a running API, as `run_local.py` starts it:
 - connection;
 - with the risk service down, a note in the sidebar instead of a warning;
+- the greeting: the persona's name, the chat language, no Claude call;
+- the greeting reaches Claude with the first message, so the reply doesn't greet again;
 - a reply with model and cost;
+- a language change mid-conversation;
 - cards;
 - the emergency banner, the staff view and the urgent summary;
 - clearing the escalation;
@@ -121,6 +125,7 @@ In built-in mode, as on Community Cloud:
 - the password;
 - the page's own API and auzy-risk with the small model, with nothing on the page that looks like an error;
 - the API's address and keys can't be changed from the page;
+- the greeting;
 - a routine message answered by the routine model;
 - the emergency banner on a crisis phrase;
 - messages paused past the spend limit.

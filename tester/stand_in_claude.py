@@ -11,6 +11,7 @@ import json
 import re
 import threading
 import uuid
+from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 USAGE = {"input_tokens": 120, "output_tokens": 60, "cache_read_input_tokens": 3000, "cache_creation_input_tokens": 0}
@@ -90,6 +91,7 @@ def answer(req: dict) -> dict:
 class _Handler(BaseHTTPRequestHandler):
     def do_POST(self):  # noqa: N802 (http.server naming)
         body = json.loads(self.rfile.read(int(self.headers.get("content-length", 0))) or b"{}")
+        self.server.requests.append(body)
         data = json.dumps(answer(body)).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -102,7 +104,9 @@ class _Handler(BaseHTTPRequestHandler):
 
 
 def start(port: int = 0) -> ThreadingHTTPServer:
-    """Serves in a background thread; returns the server (server.server_address[1] is the port)."""
+    """Serves in a background thread; returns the server (server.server_address[1] is the port; server.requests holds
+    the latest requests, for test_app.py)."""
     server = ThreadingHTTPServer(("127.0.0.1", port), _Handler)
+    server.requests = deque(maxlen=50)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server

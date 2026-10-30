@@ -3,6 +3,7 @@
 The new assistant behind the Auzy patient chat, packaged as a service that auzy-backend calls over HTTP.
 
 **What it does:**
+- greets the patient when a conversation opens, saying it is an AI (a fixed text: no cost);
 - answers patients in English, French, Arabic and Tunisian Derja;
 - checks every message for risk and alerts the care team;
 - writes one analysis per conversation: the Cognisys update, a clinician summary and, when credits run out, the
@@ -31,6 +32,8 @@ The fallback (11 MB) is also in the repository, so that the tester can run auzy-
 ## How it fits into Auzy
 
 ```
+patient opens an empty chat ─► auzy-backend ─► auzy-ai-api GET /v1/welcome ─► the greeting, saved as the first message
+
 patient (React chat) ─► auzy-backend: POST /chat/conversation/:id/messages   (credits deducted as today)
                           │ test account?  no ─► today's chat, unchanged
                           │                yes ─► queue ai_v2_request ─► integration/.../ai_v2.queue.js
@@ -94,7 +97,7 @@ the app, with auzy-risk on the small TF-IDF model. The steps and safety settings
    - **Docker was not available on the development machine, so neither image has been built yet.** Build and check
      them on your server first.
    - Without Docker, see "Run without Docker" in `auzy-ai-v2/README.md`.
-5. **auzy-backend** (five new files and two small patches; no existing file is replaced):
+5. **auzy-backend** (six new files and two small patches; no existing file is replaced):
    - Copy `auzy-ai-v2/integration/auzy-backend/src/` into auzy-backend's `src/`.
    - From inside auzy-backend, run `git apply -p2 <package>/auzy-ai-v2/integration/patches/auzy-backend-*.diff`.
    - Mount the callback routes where the app mounts its routes:
@@ -112,6 +115,7 @@ the app, with auzy-risk on the small TF-IDF model. The steps and safety settings
    - `ChatWindow.jsx` draws it;
    - `chat.store.js` keeps each message's `metadata`, which the banner is drawn from and which the store used to drop.
 7. **Test from the test accounts** (the full checklist is in `auzy-ai-v2/README.md`, "Testing inside Auzy"):
+   - Open the chat with no messages yet: the greeting appears.
    - Chat in each language.
    - Run out of credits and check the closing message, the Cognisys update and the pre-diagnostic in Auzy.
    - Read the summaries and costs with the staff token.
@@ -122,11 +126,11 @@ the app, with auzy-risk on the small TF-IDF model. The steps and safety settings
 
 | Check | Result |
 |---|---|
-| `npm test` in `auzy-ai-v2/` | **81 pass** on Node 22 and on Node 24 (the one the tester gets on Streamlit Community Cloud): engine 57, HTTP API 17, auzy-backend kit 7. The kit test runs the kit's files against stand-ins for auzy-backend's modules. |
+| `npm test` in `auzy-ai-v2/` | **87 pass** on Node 22 and on Node 24 (the one the tester gets on Streamlit Community Cloud): engine 59, HTTP API 19, auzy-backend kit 9. The kit test runs the kit's files against stand-ins for auzy-backend's modules. |
 | `test/mongo.store.check.mjs` | **9/9** against a real MongoDB (throwaway database) |
 | `test/e2e.local.mjs`: real API process, real MongoDB, real auzy-risk, stand-ins for Claude and auzy-backend, one restart midway | **9/9**: crisis → escalation and alert; tool cards; analysis delivered; state kept across the restart; idle analysis; risk service down → careful model |
 | `python -m assistant.test_risk_server` (project root) | **8/8** |
-| `python tester/test_app.py`: the tester page driven like a user, with a stand-in for Claude: against a running API, then in the built-in mode used on Streamlit Community Cloud | **25/25** |
+| `python tester/test_app.py`: the tester page driven like a user, with a stand-in for Claude: against a running API, then in the built-in mode used on Streamlit Community Cloud | **30/30** |
 | `test/integration.risk.mjs` (engine against auzy-risk) | passes; 31 ms per message on CPU |
 | The patches | apply cleanly to the files of the 2026-10-27 export, and the patched files still parse. With the store patch, a message keeps its `metadata` (checked with zod 4); without it, the banner never had its data. |
 
@@ -161,6 +165,7 @@ These estimates assume 10% crisis conversations. Each conversation has a ceiling
 **Clinical review by native-speaker clinicians:**
 - the Arabic and Derja crisis phrases (`assistant/safety.py`);
 - the emergency texts (`auzy-ai-v2/src/lib/ai/safety/emergency.js`);
+- the greeting, in all four languages (`auzy-ai-v2/src/lib/ai/welcome.js`);
 - the system prompt (`auzy-ai-v2/src/lib/ai/prompts/chat.prompt.js`);
 - the 400-message Derja sheet (`assistant/data/derja_review_sample.csv`), then retrain the risk model.
 

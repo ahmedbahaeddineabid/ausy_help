@@ -175,7 +175,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
       <li>Measured with real calls: a routine English conversation costs about <strong>0.4–1.5¢</strong>, a 10-message Derja conversation <strong>9.4¢</strong>, a short crisis conversation <strong>6.2¢</strong>.</li>
       <li>A budget governor keeps the average at <strong>$50–80 per 1,000 conversations</strong> whatever the mix of languages, and never limits crisis handling.</li>
       <li>It is delivered as an <strong>API that auzy-backend calls</strong>. Only the profiles listed as test accounts use it; everyone else keeps today's chat, and one setting switches it off.</li>
-      <li>Tested: 81 automated tests and a full local run with the real processes (API, MongoDB, risk service), plus 3 live runs of the engine with real Claude calls. Not yet run inside Auzy. The Arabic and Derja material still needs review by native-speaker clinicians.</li>
+      <li>Tested: 87 automated tests and a full local run with the real processes (API, MongoDB, risk service), plus 3 live runs of the engine with real Claude calls. Not yet run inside Auzy. The Arabic and Derja material still needs review by native-speaker clinicians.</li>
     </ul>
 
     <h2 id="starting-point">Where we started</h2>
@@ -316,7 +316,7 @@ flowchart TD
     <h3>How it plugs into Auzy</h3>
     <ul>
       <li>auzy-backend sends a patient's messages to the API only if the profile is on the test list. Everyone else keeps today's chat. If the API can't be reached, today's chat answers.</li>
-      <li>auzy-backend gets five new files: a queue consumer, a small client, and internal routes for the three lookups, the Cognisys read and the delivery of each analysis. It also gets two small patches (the chat route and the user-message queue). No existing file is replaced.</li>
+      <li>auzy-backend gets six new files: a queue consumer, a small client, the greeting that opens an empty conversation, and internal routes for the three lookups, the Cognisys read and the delivery of each analysis. It also gets two small patches (the chat route and the user-message queue). No existing file is replaced.</li>
       <li>The frontend gets two patches: the emergency banner stays visible while a conversation is escalated, and the chat store keeps the message data the banner is drawn from.</li>
       <li>The API keeps its own database on Auzy's MongoDB. It never touches Auzy's data: lookups and saves go through auzy-backend with a shared secret.</li>
       <li>The auzy-risk service runs as a separate container on the internal network (about 1.5 GB of RAM).</li>
@@ -415,10 +415,10 @@ flowchart TD
       <table>
         <thead><tr><th>Check</th><th>Status</th><th>Detail</th></tr></thead>
         <tbody>
-          <tr><td>Automated tests, with stand-ins for Claude, the database and auzy-backend</td><td><span class="pill done">81 pass</span></td><td>Engine (routing, safety, cards, credits, sessions, analysis, budget), HTTP API (keys, validation, every endpoint, retries, idle analysis), and the auzy-backend kit end to end</td></tr>
+          <tr><td>Automated tests, with stand-ins for Claude, the database and auzy-backend</td><td><span class="pill done">87 pass</span></td><td>Engine (routing, safety, cards, credits, sessions, analysis, budget, the greeting), HTTP API (keys, validation, every endpoint, retries, idle analysis), and the auzy-backend kit end to end</td></tr>
           <tr><td>MongoDB storage, against a real MongoDB</td><td><span class="pill done">9 / 9</span></td><td>Sessions, summaries, cost ledger, analyses and their delivery, indexes</td></tr>
           <tr><td>Full local run: API process, MongoDB, auzy-risk; stand-ins for Claude and auzy-backend</td><td><span class="pill done">9 / 9</span></td><td>Crisis → escalation and alert, cards, analysis delivered, state kept across a restart, risk service down</td></tr>
-          <tr><td>Streamlit tester page, driven like a user against the API (stand-in for Claude)</td><td><span class="pill done">15 / 15</span></td><td>Replies, cards, emergency banner, staff views, clearing an escalation, closing at 0 credits, costs</td></tr>
+          <tr><td>Streamlit tester page, driven like a user against the API (stand-in for Claude)</td><td><span class="pill done">30 / 30</span></td><td>The greeting, replies, cards, emergency banner, staff views, clearing an escalation, closing at 0 credits, costs; also the built-in mode used on Streamlit Community Cloud (password, its own API and auzy-risk, spend limit)</td></tr>
           <tr><td>auzy-risk service tests, real model</td><td><span class="pill done">8 pass</span></td><td>Derja and Arabic phrases, indirect risk, a risk sentence at the end of an 8,000-character message</td></tr>
           <tr><td>Engine and auzy-risk together over HTTP</td><td><span class="pill done">pass</span></td><td>All routing paths, 31 ms per check</td></tr>
           <tr><td>Live runs with real Claude calls</td><td><span class="pill done">3 runs</span></td><td>Engine, 27 October: every request format accepted; caching works from the second message. Not yet repeated through the API.</td></tr>

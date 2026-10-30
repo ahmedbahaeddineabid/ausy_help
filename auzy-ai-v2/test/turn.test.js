@@ -195,6 +195,17 @@ test('a new session starts with context from earlier conversations, only on its 
     assert.ok(!lastHint(client.chatRequests()[1]).content.includes('earlier conversations'));
 });
 
+test('the greeting the person saw goes into the hint of the conversation\'s first turn only', async () => {
+    const { client, store, turn } = make();
+    await store.saveSession({ ...newSession('c1', 'prof1'), welcome: 'Hello, I\'m Auzy, an AI support assistant.' });
+    await turn('I feel tired all the time');
+    await turn('mostly at work');
+    const [first, second] = client.chatRequests();
+    assert.match(lastHint(first).content, /opened with this greeting from you:\nHello, I'm Auzy, an AI support assistant\.\nDo not greet them/);
+    assert.equal(first.messages[0].role, 'user');                       // the history still starts with the patient
+    assert.ok(!lastHint(second).content.includes('greeting'));
+});
+
 test('no persona: only the cached base prompt', async () => {
     const client = fakeClient();
     const turns = createTurnService({ client, config, risk: fakeRisk(), store: fakeStore(), escalate: recorder(), log: silentLog });

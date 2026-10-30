@@ -1,14 +1,24 @@
 --- a/auzy-backend/src/routes/chat.route.js
 +++ b/auzy-backend/src/routes/chat.route.js
-@@ -7,6 +7,7 @@
+@@ -7,6 +7,8 @@
  import { deductCredits, InsufficientCreditsError } from '../services/profile.service.js';
  import { PERSONA1 } from '../enums/roles.enums.js';
  import { maybeTriggerDiagnostic } from '../lib/claude/diagnostic.service.js';
 +import { useAiV2 } from '../lib/ai-v2/ai-v2.client.js';
++import { sendWelcome } from '../lib/ai-v2/ai-v2.welcome.js';
  
  const CHAT_MESSAGE_CREDIT_COST = 1;
  
-@@ -77,12 +78,15 @@
+@@ -38,6 +40,8 @@
+     try {
+         const profileId = req.profile._id;
+         const convo = await getOrCreateConversation(profileId);
++        // AI v2 test accounts: an empty conversation opens with the assistant's greeting, in the browser's language.
++        if (useAiV2(profileId)) await sendWelcome(convo, req.acceptsLanguages('en', 'fr', 'ar') || 'en');
+         return res.json({ conversation: convo });
+     } catch (err) {
+         next(err);
+@@ -77,12 +81,15 @@
          }
  
          const msg = await createMessage(conversationId, payload);

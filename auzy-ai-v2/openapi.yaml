@@ -16,6 +16,39 @@ security:
   - serviceKey: []
 
 paths:
+  /v1/welcome:
+    get:
+      summary: The greeting that opens an empty conversation
+      description: |
+        A fixed text in the chat language, with the persona's name: no Claude call, no cost. It tells the patient that
+        they are talking with an AI and that the care team receives a summary. Show it as the conversation's first
+        assistant message, then send it in `history` with the patient's first message, so the first reply doesn't
+        greet them again.
+      parameters:
+        - name: language
+          in: query
+          schema: { type: string, enum: [en, fr, ar, aeb], default: en }
+          description: 'aeb: Tunisian Derja in Latin letters'
+        - name: name
+          in: query
+          schema: { type: string, maxLength: 120 }
+          description: The persona's name, if it has one
+      responses:
+        '200':
+          description: The greeting
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  text: { type: string }
+                  language: { type: string, enum: [en, fr, ar, aeb] }
+              example:
+                text: "Bonjour, je suis Auzy, une IA de soutien. Je suis là pour vous écouter et vous soutenir, [...] Comment vous sentez-vous aujourd'hui ?"
+                language: fr
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
   /v1/messages:
     post:
       summary: One patient turn
@@ -357,7 +390,9 @@ components:
         history:
           type: array
           maxItems: 50
-          description: Earlier messages; used only for a conversation's first turn on this API (continuity from the old chat)
+          description: |
+            Earlier messages, read only on a conversation's first turn on this API: the greeting from GET /v1/welcome
+            (assistant messages only), so the first reply doesn't greet again, or the old chat's last messages, for continuity
           items:
             type: object
             properties:

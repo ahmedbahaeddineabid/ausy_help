@@ -23,6 +23,7 @@ const aiSessionSchema = new mongoose.Schema(
         sessionNumber: { type: Number, default: 1 },
         needsAnalysis: { type: Boolean, default: false },
         previousContext: String,
+        welcome: String,                                // the greeting the patient saw before their first message
         language: String,
         lastTurnAt: Date,
         lastAnalysisAt: Date,

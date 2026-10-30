@@ -36,6 +36,9 @@ class Api:
     def health(self):
         return self._call("GET", "/v1/health")
 
+    def welcome(self, language: str, name: str = ""):
+        return self._call("GET", "/v1/welcome", self.service_key, params={"language": language, "name": name})
+
     def send(self, payload: dict):
         return self._call("POST", "/v1/messages", self.service_key, payload)
 

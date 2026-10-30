@@ -57,7 +57,7 @@ LANGUAGE_NOTES = {
     "العربية": "The patient switched the chat language to Arabic.",
     "Derja": "The patient switched the chat language to Tunisian Derja.",
 }
-NO_SWITCH = "—"
+CHAT_LANGUAGES = {"English": "en", "Français": "fr", "العربية": "ar", "Derja": "aeb"}     # the greeting's language codes
 CARD_LABELS = {"profiles": "Professionals", "appointments": "Appointments", "tests": "Screening tests"}
 
 ss = st.session_state
@@ -116,7 +116,9 @@ ss.setdefault("profile_id", secrets.token_hex(12))
 ss.setdefault("credits", 10)
 ss.setdefault("eligible", True)
 ss.setdefault("persona_mode", "Sample persona (Auzy)")
-ss.setdefault("lang_switch", NO_SWITCH)
+ss.setdefault("chat_language", "English")
+ss.setdefault("welcome", None)                          # the greeting the conversation opened with, once the patient writes
+ss.setdefault("reply_language", None)                   # the chat language the API last heard of
 ss.setdefault("messages", [])
 ss.setdefault("emergency", None)
 ss.setdefault("last_end", None)
@@ -131,6 +133,8 @@ def new_conversation():
     ss.messages = []
     ss.emergency = None
     ss.last_end = None
+    ss.welcome = None
+    ss.reply_language = None
 
 
 def queue(text: str):
@@ -153,6 +157,11 @@ def fetch_health(url: str) -> dict:
         return {"error": str(e)}
 
 
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_welcome(url: str, service_key: str, language: str, name: str) -> dict:
+    return Api(url, service_key, "").welcome(language, name)            # an error is raised, never cached
+
+
 def persona():
     if ss.persona_mode == "No persona":
         return None
@@ -161,6 +170,17 @@ def persona():
     rules = [r.strip() for r in ss.get("persona_rules", "").splitlines() if r.strip()]
     return {"name": ss.get("persona_name", ""), "description": ss.get("persona_description", ""),
             "behavior": ss.get("persona_behavior", ""), "rules": rules}
+
+
+def greeting() -> dict | None:
+    """The greeting at the top of the chat, from the API. Fixed once the patient writes; until then it follows the chat
+    language and the persona. None if the API can't give it (the chat then starts empty, as Auzy's does today)."""
+    if ss.welcome:
+        return ss.welcome
+    try:
+        return fetch_welcome(ss.api_url, ss.service_key, CHAT_LANGUAGES[ss.chat_language], (persona() or {}).get("name") or "")
+    except ApiError:
+        return None
 
 
 # ---------------------------------------------------------------- sidebar
@@ -206,7 +226,9 @@ with st.sidebar:
         st.text_area("Description", key="persona_description", height=68)
         st.text_input("Tone", key="persona_behavior")
         st.text_area("Rules (one per line)", key="persona_rules", height=68)
-    st.selectbox("Chat language switch (sent with the next message)", [NO_SWITCH, *LANGUAGE_NOTES], key="lang_switch")
+    st.selectbox("Chat language", list(CHAT_LANGUAGES), key="chat_language",
+                 help="The greeting's language. Changed once the conversation has started, it reaches the assistant with "
+                      "the next message, like Auzy's chat-language menu.")
 
 api = Api(ss.api_url, ss.service_key, ss.staff_token)
 cid = ss.conversation_id.strip().lower()
@@ -316,9 +338,13 @@ def send(text: str):
         return
     if spend_paused():
         return
-    notes =[LANGUAGE_NOTES[ss.lang_switch]] if ss.lang_switch in LANGUAGE_NOTES else []
-    payload = {"conversationId": cid, "profileId": pid, "text": text, "persona": persona(), "notes": notes,
+    welcome = greeting()
+    notes = [LANGUAGE_NOTES[ss.chat_language]] if ss.reply_language and ss.chat_language != ss.reply_language else []
+    # The greeting goes along as history, as auzy-backend sends the latest messages; the API reads it on the first message.
+    history = [{"role": "assistant", "content": welcome["text"]}] if welcome else []
+    payload = {"conversationId": cid, "profileId": pid, "text": text, "persona": persona(), "notes": notes, "history": history,
                "creditsRemaining": ss.credits - 1, "freeConsultationEligible": bool(ss.eligible)}
+    ss.welcome, ss.reply_language = welcome, ss.chat_language
     ss.messages.append({"role": "user", "text": text, "notes": notes})
     with st.chat_message("user"):
         st.markdown(text)
@@ -330,7 +356,7 @@ def send(text: str):
             st.rerun()
     ss.messages.append({"role": "assistant", "meta": reply})
     ss.emergency = reply.get("emergencyText") if reply.get("escalated") else None
-    ss._after_send = {"credits": ss.credits - 1, "lang_switch": NO_SWITCH}
+    ss._after_send = {"credits": ss.credits - 1}
     st.rerun()
 
 
@@ -346,6 +372,11 @@ tab_chat, tab_conversation, tab_summaries, tab_costs = st.tabs(["Chat", "Convers
 with tab_chat:
     if ss.emergency:
         st.error(ss.emergency, icon="🚨")
+    welcome = greeting()
+    if welcome:
+        with st.chat_message("assistant"):
+            st.markdown(welcome["text"])
+            st.caption(f"greeting: fixed text, no Claude call · {welcome['language']} · {cents(0)}")
     for message in ss.messages:
         render_message(message)
     if ss.credits == 0 and ss.messages:

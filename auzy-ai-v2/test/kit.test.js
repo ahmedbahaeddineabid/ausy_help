@@ -31,7 +31,8 @@ const STUBS = {
         export const Message = { find(filter) {
             let rows = db.messages.filter((m) => String(m.conversation) === String(filter.conversation));
             const q = { sort() { rows = [...rows].reverse(); return q; }, limit(n) { rows = rows.slice(0, n); return q; }, lean: async () => structuredClone(rows) };
-            return q; } };`,
+            return q; },
+            async exists(filter) { return db.messages.some((m) => String(m.conversation) === String(filter.conversation)) ? { _id: 'm1' } : null; } };`,
     'src/model/Profile.js': `
         export const profiles = new Map();
         export const Profile = { findById(id) { return { select: async () => profiles.get(String(id)) || null }; } };`,
@@ -233,6 +234,47 @@ test('API unreachable: today\'s chat answers instead, and at 0 credits the old p
     assert.deepEqual(m.rabbit.pushed.at(-1), ['completion_request', { conversation: CONV }]);
     assert.deepEqual(m.v1.triggered.at(-1), [PROFILE, CONV]);
     assert.match(errors.join('\n'), /today's chat answers instead/);
+});
+
+test('opening an empty conversation: the greeting is saved once, in the given language; the first reply knows it', async () => {
+    const conv3 = '6650000000000000000000c3';
+    const convo = { _id: conv3, profile: PROFILE, currentAssistant: null };
+    m.chat.conversations.set(conv3, convo);
+    const { sendWelcome } = await load('src/lib/ai-v2/ai-v2.welcome.js');
+    const saved = () => m.messages.db.messages.filter((x) => x.conversation === conv3);
+    await Promise.all([sendWelcome(convo, 'fr'), sendWelcome(convo, 'fr')]);           // the chat opened twice at once
+    assert.equal(saved().length, 1);
+    assert.match(saved()[0].content, /^Bonjour, je suis Auzy, une IA de soutien\./);    // the platform's default persona
+    assert.deepEqual(saved()[0].metadata, { ai: { version: 2, welcome: true } });
+    await sendWelcome(convo, 'en');                                                       // not empty any more
+    assert.equal(saved().length, 1);
+
+    m.messages.db.messages.push({ conversation: conv3, role: 'user', content: 'Je dors mal' });
+    await consume({ conversation: conv3, creditsRemaining: 9 });
+    const hint = lastHint(api.client.chatRequests().at(-1)).content;
+    assert.match(hint, /opened with this greeting from you:\nBonjour, je suis Auzy/);
+    assert.doesNotMatch(hint, /earlier conversations/);
+    assert.equal(saved().at(-1).role, 'assistant');
+});
+
+test('opening an empty conversation without the API: it opens empty, and the next opening tries again', async () => {
+    const conv4 = '6650000000000000000000c4';
+    const convo = { _id: conv4, profile: PROFILE, currentAssistant: null };
+    const { sendWelcome } = await load('src/lib/ai-v2/ai-v2.welcome.js');
+    process.env.AI_V2_URL = 'http://127.0.0.1:9';
+    const errors = [];
+    const original = console.error;
+    console.error = (...a) => errors.push(a.join(' '));
+    try {
+        await sendWelcome(convo, 'en');
+    } finally {
+        console.error = original;
+        process.env.AI_V2_URL = api.url;
+    }
+    assert.equal(m.messages.db.messages.filter((x) => x.conversation === conv4).length, 0);
+    assert.match(errors.join('\n'), /no greeting for conversation 6650000000000000000000c4, the chat opens empty/);
+    await sendWelcome(convo, 'en');
+    assert.match(m.messages.db.messages.find((x) => x.conversation === conv4).content, /^Hello, I'm Auzy, an AI support assistant\./);
 });
 
 test('the kit\'s Cognisys adapter is the same file as the engine\'s', () => {

@@ -1,5 +1,5 @@
 // HTTP API v1 (see openapi.yaml). JSON in and out; errors are { error, message? }.
-//   service key (AUZY_AI_API_KEY): POST /v1/messages, POST /v1/conversations/:id/end
+//   service key (AUZY_AI_API_KEY): GET /v1/welcome, POST /v1/messages, POST /v1/conversations/:id/end
 //   staff token (AUZY_AI_STAFF_TOKEN): conversation state, clear escalation, summaries, costs (and /end)
 //   no key: GET /v1/health
 // Patient text is never logged.
@@ -8,6 +8,7 @@ import express from 'express';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { createToolbox } from '../src/lib/ai/tools/index.js';
 import { newSession } from '../src/lib/ai/turn.service.js';
+import { welcomeText, WELCOME_LANGUAGES } from '../src/lib/ai/welcome.js';
 
 const OBJECT_ID = /^[a-f\d]{24}$/i;
 const DAY_MS = 86400000;
@@ -107,9 +108,16 @@ export function createRoutes({ ai, store, scheduler, auzy, settings, withLock, c
     const staff = requireToken([settings.staffToken], 'Staff');
     const serviceOrStaff = requireToken([settings.apiKey, settings.staffToken], 'Service');
 
-    /** First message handled here for a conversation that started on the old chat: carry its last messages over. */
+    /**
+     * First message handled here for a conversation: the greeting the patient saw (assistant messages only), or, for a
+     * conversation that started on the old chat, its last messages.
+     */
     async function seedFromHistory(m) {
         if (await store.loadSession(m.conversationId)) return;
+        if (!m.history.some((h) => h.role === 'user')) {
+            await store.saveSession({ ...newSession(m.conversationId, m.profileId), welcome: m.history.map((h) => h.content).join('\n\n') });
+            return;
+        }
         let summary = null;
         try {
             summary = (await auzy.cognisys.getSnapshot(m.profileId))?.profile?.summary || null;
@@ -122,6 +130,15 @@ export function createRoutes({ ai, store, scheduler, auzy, settings, withLock, c
             previousContext: `Profile summary: ${summary && summary !== 'Pending summary' ? summary : 'none'}\nLast messages:\n${recent}`,
         });
     }
+
+    // The greeting that opens an empty conversation: fixed text, no Claude call. The client shows it, then sends it as
+    // `history` with the patient's first message, so the first reply doesn't greet them again.
+    app.get('/v1/welcome', service, wrap(async (req, res) => {
+        const { language = 'en', name = '' } = req.query;
+        if (!WELCOME_LANGUAGES.includes(language)) throw new BadRequest(`language must be one of ${WELCOME_LANGUAGES.join(', ')}`);
+        if (typeof name !== 'string') throw new BadRequest('name must be a string');
+        res.json({ text: welcomeText(language, name.trim().slice(0, 120)), language });
+    }));
 
     app.post('/v1/messages', service, wrap(async (req, res) => {
         const m = readTurn(req.body, settings.maxTextChars);

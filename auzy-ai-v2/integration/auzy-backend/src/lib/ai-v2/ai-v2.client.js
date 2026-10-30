@@ -16,11 +16,11 @@ export function useAiV2(profileId) {
     return listed.includes('*') || listed.includes(String(profileId));
 }
 
-async function call(method, path, body) {
+async function call(method, path, body, timeoutMs = Number(env('AI_V2_TIMEOUT_MS', '120000'))) {
     const base = env('AI_V2_URL').replace(/\/$/, '');
     if (!base) throw new Error('AI_V2_URL is not set');
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), Number(env('AI_V2_TIMEOUT_MS', '120000')));
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
         const res = await fetch(`${base}${path}`, {
             method,
@@ -35,6 +35,9 @@ async function call(method, path, body) {
         clearTimeout(timer);
     }
 }
+
+/** The greeting that opens an empty conversation -> { text, language }. Fixed text, no Claude call: a short timeout. */
+export const getWelcome = ({ language, name }) => call('GET', `/v1/welcome?${new URLSearchParams({ language, name: name || '' })}`, undefined, 5000);
 
 /** One patient turn -> { reply, cards: { profiles, appointments, tests }, escalated, emergencyText, model, error, ... } */
 export const sendTurn = (payload) => call('POST', '/v1/messages', payload);

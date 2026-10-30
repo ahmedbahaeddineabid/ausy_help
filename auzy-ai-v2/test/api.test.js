@@ -227,6 +227,36 @@ test('first message of a conversation that started on the old chat carries its l
     assert.doesNotMatch(lastHint(api.client.chatRequests()[1]).content, /something else|earlier conversations/);
 }));
 
+test('greeting: fixed text in the chat language with the persona\'s name; service key only; no Claude call', () => withApi({}, async (api) => {
+    const get = (query, token = API_KEY) => api.call('GET', `/v1/welcome${query}`, { token });
+    const fr = await get('?language=fr&name=Sami');
+    assert.equal(fr.status, 200);
+    assert.equal(fr.body.language, 'fr');
+    assert.match(fr.body.text, /^Bonjour, je suis Sami, une IA de soutien\. .*l'équipe de soins/);
+    assert.deepEqual((await get('')).body, { text: (await get('?language=en')).body.text, language: 'en' });
+    assert.match((await get('')).body.text, /^Hello, I'm Auzy's AI support assistant\./);
+    assert.match((await get('?language=ar&name=Auzy')).body.text, /^مرحبًا، أنا Auzy،/);
+    assert.match((await get('?language=aeb')).body.text, /^Aslema, ena l'assistant virtuel mta3 Auzy/);
+    assert.match((await get('?language=de')).body.message, /language must be one of en, fr, ar, aeb/);
+    assert.equal((await get('?language=fr&name=a&name=b')).status, 400);
+    assert.equal((await get('?language=fr', null)).status, 401);
+    assert.equal((await get('?language=fr', STAFF_TOKEN)).status, 401);
+    assert.equal(api.client.requests.length, 0);
+}));
+
+test('the greeting sent as history with the first message: that reply knows it; no profile lookup, no greeting after', () => withApi({}, async (api, auzy) => {
+    const welcome = (await api.call('GET', '/v1/welcome?language=en&name=Auzy')).body.text;
+    const history = [{ role: 'assistant', content: welcome }];
+    await api.send({ text: 'I feel tired all the time', history });
+    await api.send({ text: 'Mostly at work', history });
+    const [first, second] = api.client.chatRequests();
+    const hint = lastHint(first).content;
+    assert.match(hint, /opened with this greeting from you:\nHello, I'm Auzy, an AI support assistant\./);
+    assert.doesNotMatch(hint, /earlier conversations/);
+    assert.doesNotMatch(lastHint(second).content, /greeting/);
+    assert.equal(auzy.calls.filter(([kind]) => kind === 'cognisys').length, 0);
+}));
+
 test('a Claude failure returns the fallback text in the patient\'s language, marked as an error', () => withApi({
     client: apiClient({ chat: [new Error('overloaded')] }),
 }, async (api) => {

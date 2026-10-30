@@ -13,6 +13,8 @@
 // Sessions: the conversation history sent to Claude covers the current session only. The end-of-conversation
 // analysis (credits run out, or the chat goes idle) closes the session; the next one starts fresh, seeded with
 // the person's Cognisys profile summary and their last few messages, so cost stays bounded.
+// A conversation's first turn also carries the greeting the person saw before writing (welcome.js), if any, so the
+// reply doesn't greet them twice.
 
 import { systemBlocks, hintMessage } from './prompts/chat.prompt.js';
 import { callClaude } from './claude.call.js';
@@ -43,6 +45,7 @@ export function newSession(conversationId, profileId) {
         sessionNumber: 1,
         needsAnalysis: false,
         previousContext: null,       // seed for the next session, written by the end-of-conversation analysis
+        welcome: null,               // the greeting the person saw before their first message
         language: null,
         lastTurnAt: null,
         costUsd: 0,                  // chat cost of the current session, for the per-conversation ceiling
@@ -115,9 +118,10 @@ export function createTurnService({ client, config, risk, store, escalate, polic
         // 2. Build this turn on a copy of the history: only a successful reply is committed.
         const closing = creditsRemaining === 0 ? { escalated: session.escalation.active, freeConsultation } : null;
         const context = session.turns === 0 ? session.previousContext : null;
+        const welcome = session.totalTurns === 0 ? session.welcome : null;
         const userMsg = { role: 'user', content: [{ type: 'text', text: userText }] };
         const system = systemBlocks(assistant, config);
-        let messages = [...session.transcript, userMsg, hintMessage({ state, reasons, unconfirmed: soft, closing, notes, context })];
+        let messages = [...session.transcript, userMsg, hintMessage({ state, reasons, unconfirmed: soft, closing, notes, context, welcome })];
 
         // Who writes this reply, and how hard it thinks.
         //   escalated                  careful model, its own effort (medium); the ceiling never applies to safety
@@ -150,7 +154,7 @@ export function createTurnService({ client, config, risk, store, escalate, polic
                 // The routine model's tag alone never escalates: the careful model answers this same message instead.
                 routineFlag = result.riskFlag;
                 reasons.push(`first draft flagged ${routineFlag}`);
-                messages = [...session.transcript, userMsg, hintMessage({ state, reasons, unconfirmed: true, closing, notes, context })];
+                messages = [...session.transcript, userMsg, hintMessage({ state, reasons, unconfirmed: true, closing, notes, context, welcome })];
                 [model, effort] = [careful, config.effort[careful]];
                 result = await callClaude({ client, config, model, effort, system, toolbox, messages });
                 for (const r of result.responses) turnCost += await logUsage('second_opinion', model, r, session, result.refused);

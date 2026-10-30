@@ -9,6 +9,7 @@ import { createWebhookNotifier } from '../src/lib/ai/notify.js';
 import { riskTag, stripTags, basePrompt, personaBlock } from '../src/lib/ai/prompts/chat.prompt.js';
 import { analysisSchema } from '../src/lib/ai/prompts/analysis.prompt.js';
 import { fixMixedScript } from '../src/lib/ai/text.js';
+import { welcomeText, WELCOME_LANGUAGES } from '../src/lib/ai/welcome.js';
 import { config, HAIKU, fakeClient, fakeServices, reply, toolCall, refusal, longBio, silentLog } from './helpers.js';
 
 test('compact keeps listed fields, shortens text, turns people into names, drops the rest', () => {
@@ -111,6 +112,19 @@ test('prompts: emergency number, safety over persona, empty persona', () => {
     assert.equal(personaBlock({}), null);
     assert.equal(personaBlock(null), null);
     assert.match(personaBlock({ name: 'X', rules: ['r1'] }), /- r1/);
+});
+
+test('greeting: says it is an AI and that the care team gets a summary, in each language; the name is taken as is', () => {
+    assert.deepEqual(WELCOME_LANGUAGES, ['en', 'fr', 'ar', 'aeb']);
+    const says = { en: [/an AI/, /care team/], fr: [/une IA/, /équipe de soins/], ar: [/الذكاء الاصطناعي/, /فريق الرعاية/], aeb: [/bel IA/, /équipe/] };
+    for (const language of WELCOME_LANGUAGES) {
+        for (const pattern of says[language]) assert.match(welcomeText(language, 'Sami'), pattern, language);
+        assert.ok(welcomeText(language, 'Sami').includes('Sami'), language);
+        assert.ok(!welcomeText(language).includes('{name}'), language);
+    }
+    assert.match(welcomeText('en'), /^Hello, I'm Auzy's AI support assistant\. I'm here to listen/);
+    assert.equal(welcomeText('de', 'Sami'), welcomeText('en', 'Sami'));
+    assert.match(welcomeText('en', 'A$&B'), /^Hello, I'm A\$&B, an AI support assistant\./);
 });
 
 test('analysis schemas are strict everywhere (structured outputs)', () => {

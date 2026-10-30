@@ -94,11 +94,16 @@ export function systemBlocks(assistant, config) {
 
 /**
  * Mid-conversation system message sent right after the patient's message: screening signals, chat-language
- * changes, context from earlier sessions, and the closing note when credits run out. Placed after a user turn,
- * so the cached history before it is untouched.
+ * changes, context from earlier sessions, the greeting the person saw before their first message, and the closing
+ * note when credits run out. Placed after a user turn, so the cached history before it is untouched.
  */
-export function hintMessage({ state = 'unknown', reasons = [], unconfirmed = false, closing = null, notes = [], context = null }) {
+export function hintMessage({ state = 'unknown', reasons = [], unconfirmed = false, closing = null, notes = [], context = null, welcome = null }) {
     const parts = [];
+    if (welcome) {
+        parts.push(`Before the person wrote, the chat opened with this greeting from you:\n${welcome}\n`
+            + 'Do not greet them or introduce yourself again. If the greeting already said that the conversation is summarized '
+            + 'for the care team, do not repeat it in this reply.');
+    }
     if (context) {
         parts.push(`Context from this person's earlier conversations, for continuity only (do not quote it or mention it unless relevant):\n${context}`);
     }

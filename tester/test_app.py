@@ -36,6 +36,16 @@ def texts(elements) -> str:
     return " | ".join(str(e.value) for e in elements)
 
 
+def replies(at) -> list:
+    """The assistant's replies, without the greeting that opens the conversation."""
+    return [m for m in at.chat_message if m.name == "assistant" and "no Claude call" not in texts(m.caption)]
+
+
+def chat_requests(claude) -> list[dict]:
+    """The chat calls the stand-in received (not the analyses), oldest first."""
+    return [r for r in claude.requests if not (r.get("output_config") or {}).get("format")]
+
+
 def with_running_api():
     """The page against an API that is already running, as run_local.py starts it."""
     with tempfile.TemporaryFile() as log:
@@ -53,14 +63,29 @@ def with_running_api():
                   not at.warning and not at.error and "Claude screens every message" in texts(at.sidebar.caption),
                   f"{texts(at.warning)} {texts(at.error)} {texts(at.sidebar.caption)}")
 
+            opening = at.chat_message
+            check("the conversation opens with the greeting: the persona's name, in the chat language, no Claude call",
+                  len(opening) == 1 and "Hello, I'm Auzy, an AI support assistant." in texts(opening[0].markdown)
+                  and "no Claude call" in texts(opening[0].caption), texts(at.markdown))
+            at.sidebar.selectbox(key="chat_language").set_value("Français").run()
+            check("before the first message, the greeting follows the chat language",
+                  "Bonjour, je suis Auzy, une IA de soutien." in texts(at.chat_message[0].markdown), texts(at.markdown))
+
             at.chat_input[0].set_value("I barely sleep, I wake up at 3am").run()
-            replies = [m for m in at.chat_message if m.name == "assistant"]
+            answers = replies(at)
             check("a typed message gets a reply, with the model and cost below it",
-                  len(replies) == 1 and "[stand-in]" in texts(replies[0].markdown) and "claude-sonnet-5-5" in texts(replies[0].caption),
+                  len(answers) == 1 and "[stand-in]" in texts(answers[0].markdown) and "claude-sonnet-5-5" in texts(answers[0].caption),
                   texts(at.markdown))
             check("one credit used", at.sidebar.number_input(key="credits").value == 9)
+            hint = str(chat_requests(api.claude)[0]["messages"][-1].get("content"))
+            check("the API told Claude which greeting the patient saw, so the first reply doesn't greet again",
+                  "opened with this greeting from you:\nBonjour, je suis Auzy" in hint, hint[:300])
 
+            at.sidebar.selectbox(key="chat_language").set_value("Derja").run()
             at.button(key="sample_4").click().run()                 # "Can you show me a professional I could talk to?"
+            check("a later language change goes with the next message; the greeting stays as the patient saw it",
+                  "switched the chat language to Tunisian Derja" in texts(at.caption)
+                  and "Bonjour, je suis Auzy" in texts(at.chat_message[0].markdown), texts(at.caption))
             check("a lookup shows its cards, with names in demo mode", "Amina B." in texts(at.markdown), texts(at.markdown))
 
             at.button(key="sample_9").click().run()                 # crisis, English
@@ -90,8 +115,9 @@ def with_running_api():
                   metrics.get("Conversations") == "1" and metrics.get("Budget level") == "standard", str(metrics))
 
             next(b for b in at.button if b.label == "New conversation").click().run()
-            check("a new conversation starts empty with 10 credits",
-                  not [m for m in at.chat_message] and at.sidebar.number_input(key="credits").value == 10 and not at.exception)
+            check("a new conversation starts with only the greeting, in the current chat language, and 10 credits",
+                  len(at.chat_message) == 1 and "Aslema, ena Auzy" in texts(at.chat_message[0].markdown)
+                  and at.sidebar.number_input(key="credits").value == 10 and not at.exception, texts(at.markdown))
             check("no error anywhere on the page", not at.exception, str(at.exception))
         finally:
             api.stop()
@@ -127,16 +153,17 @@ def built_in_mode():
               "risk model: the small one (TF-IDF)" in texts(at.sidebar.caption) and not at.warning and not at.error,
               f"{texts(at.sidebar.caption)} {texts(at.warning)} {texts(at.error)}")
         check("its address and keys can't be changed from the page", "API address" not in [t.label for t in at.sidebar.text_input])
+        check("the chat opens with the greeting", "Hello, I'm Auzy, an AI support assistant." in texts(at.markdown), texts(at.markdown))
         at.chat_input[0].set_value("I can't sleep").run()
-        replies = [m for m in at.chat_message if m.name == "assistant"]
+        answers = replies(at)
         check("with the risk service, a routine message goes to the routine model",
-              len(replies) == 1 and "claude-haiku-5-5" in texts(replies[0].caption), texts(at.caption))
+              len(answers) == 1 and "claude-haiku-5-5" in texts(answers[0].caption), texts(at.caption))
         at.button(key="sample_9").click().run()                 # crisis, English
         check("a crisis phrase shows the emergency banner", "190" in texts(at.error), texts(at.error))
         at.secrets["TESTER_MAX_SPEND_USD"] = "0.000001"
         at.chat_input[0].set_value("Still awake").run()
         check("past the spend limit, messages are paused",
-              len([m for m in at.chat_message if m.name == "assistant"]) == 2 and "spend limit" in texts(at.warning), texts(at.warning))
+              len(replies(at)) == 2 and "spend limit" in texts(at.warning), texts(at.warning))
         check("no error anywhere on the page", not at.exception, str(at.exception))
     finally:
         builtin_api.stop_all()

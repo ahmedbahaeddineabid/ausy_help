@@ -30,12 +30,22 @@ An escalation stays active (Sonnet, banner) until staff clear it: `POST /v1/conv
 The session sent to Claude covers one sitting only; the next one starts with the profile summary and the last
 messages, so cost per turn stays bounded.
 
+**The greeting.** `GET /v1/welcome?language=fr&name=Auzy` returns the text that opens an empty conversation:
+- in English, French, Arabic or Derja, with the persona's name;
+- it says that the patient is talking with an AI, and that the care team receives a summary;
+- it is a fixed text (`src/lib/ai/welcome.js`), so there is no Claude call and no cost.
+
+The client shows it, then sends it in `history` with the patient's first message, so the first reply doesn't greet
+them again. In Auzy, the kit saves it as the first assistant message when a test patient opens an empty chat, in the
+browser's language (English, French or Arabic).
+
 ## Endpoints
 
 Full schemas: `openapi.yaml`. Ids are Auzy's MongoDB ids (24 hexadecimal characters).
 
 | Endpoint | Key | Purpose |
 |---|---|---|
+| `GET /v1/welcome?language=fr&name=Auzy` | service | The greeting that opens an empty conversation (fixed text, no Claude call) |
 | `POST /v1/messages` | service | One patient turn |
 | `POST /v1/conversations/:id/end` | service or staff | Run the end-of-conversation analysis now (normally automatic) |
 | `GET /v1/conversations/:id` | staff | Escalation state, screening signals, summaries, analyses and their delivery, cost |
@@ -72,8 +82,9 @@ curl -s -X POST $API/v1/conversations/6650000000000000000000c1/clear-escalation 
 - `creditsRemaining`: the balance after this message. At 0 the reply closes warmly and the analysis follows.
 - `freeConsultationEligible`: at 0 credits, whether the patient gets the pre-diagnostic and the free consultation
   offer (eligible and none yet: the rule of `maybeTriggerDiagnostic`).
-- `history`: a few earlier messages; used only for a conversation's first turn on the API, for continuity from
-  today's chat.
+- `history`: a few earlier messages, read only on a conversation's first turn on the API. Either the greeting
+  (assistant messages only), so the first reply doesn't greet again, or the last messages of today's chat, for
+  continuity.
 
 **What comes back:**
 - `reply`: the text to save as the assistant message.
@@ -161,33 +172,36 @@ the Streamlit tester page together (see `../tester/README.md`).
 
 ## Testing inside Auzy (test accounts)
 
-1. **Routine conversation**, in each language: English, French, Arabic, Derja in Latin letters.
+1. **Greeting:** open the chat of a test account that has no messages yet.
+   - The greeting appears in the browser's language.
+   - The first reply doesn't greet again.
+2. **Routine conversation**, in each language: English, French, Arabic, Derja in Latin letters.
    - Replies stay in the patient's language and script.
    - "Can you show me a professional?" shows consultant cards.
    - A question about appointments shows the patient's own appointments.
    - A question about tests shows test cards.
    - Auzy's chat store drops appointment and test cards today, in its own chat too. They show once it keeps them
      (see "Decisions still open" in `../README.md`).
-2. **Language switch:** change the chat language mid-conversation; the next reply follows it.
-3. **Last credit:** a short, warm closing that mentions the pre-assessment.
+3. **Language switch:** change the chat language mid-conversation; the next reply follows it.
+4. **Last credit:** a short, warm closing that mentions the pre-assessment.
    - About a minute later, the pre-diagnostic notification appears.
    - The Cognisys screens show the update.
    - `GET /v1/conversations/:id` shows `"delivery": "delivered"`.
-4. **Idle:** stop writing for 30 minutes; `GET /v1/conversations/:id` shows a new analysis.
-5. **Crisis** (warn the person on call first: it sends a real alert):
+5. **Idle:** stop writing for 30 minutes; `GET /v1/conversations/:id` shows a new analysis.
+6. **Crisis** (warn the person on call first: it sends a real alert):
    - The reply is careful and includes the emergency number.
    - The banner stays visible, also after reloading the page.
    - The escalation webhook fires.
    - `GET /v1/summaries?urgent=true` shows the summary.
    - Clear the escalation afterwards.
-6. **Costs:** `GET /v1/costs?days=1`, after a few conversations.
-7. **Outage:** stop the API; a test account's next message is answered by today's chat.
+7. **Costs:** `GET /v1/costs?days=1`, after a few conversations.
+8. **Outage:** stop the API; a test account's next message is answered by today's chat.
 
 ## Checks
 
 | Command (from `auzy-ai-v2/`) | Needs | What it checks |
 |---|---|---|
-| `npm test` | nothing | 81 tests: the engine (routing, safety, second opinions, caching, analysis, budget), the HTTP API (keys, validation, every endpoint, escalation, delivery retries, idle analysis, lock, restart of the budget level), and the auzy-backend kit end to end against stand-ins of auzy-backend's modules |
+| `npm test` | nothing | 87 tests: the engine (routing, safety, second opinions, caching, analysis, budget, the greeting), the HTTP API (keys, validation, every endpoint, escalation, delivery retries, idle analysis, lock, restart of the budget level), and the auzy-backend kit end to end against stand-ins of auzy-backend's modules |
 | `MONGODB_URI=... node test/mongo.store.check.mjs` | any MongoDB | the MongoDB store, in a throwaway database it drops afterwards |
 | `MONGODB_URI=... node test/e2e.local.mjs` | MongoDB + auzy-risk running | the real API process with stand-ins for Claude and auzy-backend, a restart midway, the risk service down |
 | `node test/integration.risk.mjs` | auzy-risk running | the engine against the real risk service |
@@ -215,6 +229,7 @@ the Streamlit tester page together (see `../tester/README.md`).
 | `src/lib/ai/safety/` | auzy-risk client; emergency texts and language guess |
 | `src/lib/ai/budget.js` | Quality levels and the governor's rule |
 | `src/lib/ai/text.js` | Fixes Arabic letters inside Latin-script Derja replies |
+| `src/lib/ai/welcome.js` | The greeting that opens a conversation, in 4 languages |
 | `src/lib/ai/store.mongo.js`, `budget.mongo.js`, `src/model/` | MongoDB models and queries |
 | `integration/` | What auzy-backend and auzy-frontend need (see `../README.md`, step 5) |
 | `in-backend-option/` | Not needed for the API: the same engine wired directly into auzy-backend (Redis lock, RabbitMQ consumer), for later if you prefer no extra service. Not run inside auzy-backend. |

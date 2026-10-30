@@ -45,6 +45,7 @@ try {
             signals: [{ turn: 1, at: T0, state: 'stress', riskScore: 0.02, model: SONNET, reasons: [], riskFlag: null }],
             escalation: { active: true, since: T0, reason: 'crisis phrase (abuse, aeb)', clearedAt: null, clearedBy: null },
             previousContext: 'Profile summary: none',
+            welcome: 'Aslema, ena Auzy, assistant virtuel yekhdem bel IA.',
         };
         await store.saveSession(s);
         assert.deepEqual(await store.loadSession(C1), { ...s, lastAnalysisAt: null });
