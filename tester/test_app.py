@@ -4,7 +4,7 @@ Claude. Needs Node 20.6+ (or the nodejs-wheel-binaries package) and the packages
     python tester/test_app.py
 
 First against an API that is already running (AUZY_AI_URL set, as run_local.py does), then in the page's built-in
-mode, as on Streamlit Community Cloud: password, its own API, spend limit.
+mode, as on Streamlit Community Cloud: password, its own API and auzy-risk, spend limit.
 """
 from __future__ import annotations
 
@@ -49,6 +49,9 @@ def with_running_api():
             check("the page loads and connects to the API", not at.exception and "Connected" in texts(at.sidebar.success),
                   f"{at.exception} {texts(at.sidebar.error)}")
             check("the stand-in notice is shown", "Stand-in Claude" in texts(at.info))
+            check("with the risk service down, no warning or error: a note says Claude screens every message",
+                  not at.warning and not at.error and "Claude screens every message" in texts(at.sidebar.caption),
+                  f"{texts(at.warning)} {texts(at.error)} {texts(at.sidebar.caption)}")
 
             at.chat_input[0].set_value("I barely sleep, I wake up at 3am").run()
             replies = [m for m in at.chat_message if m.name == "assistant"]
@@ -98,8 +101,9 @@ def with_running_api():
 
 
 def built_in_mode():
-    """No AUZY_AI_URL, as on Streamlit Community Cloud: the page starts its own API. With a key it counts as real Claude
-    (for the spend limit); ANTHROPIC_BASE_URL sends those calls to the stand-in, so this costs nothing either."""
+    """No AUZY_AI_URL, as on Streamlit Community Cloud: the page starts its own API and auzy-risk (small model). With a
+    key it counts as real Claude (for the spend limit); ANTHROPIC_BASE_URL sends those calls to the stand-in, so this
+    costs nothing either."""
     for name in PAGE_SETTINGS:
         os.environ.pop(name, None)
     claude = stand_in_claude.start()
@@ -109,7 +113,7 @@ def built_in_mode():
         at = AppTest.from_file(str(HERE / "app.py"), default_timeout=300)    # the first start may install the API's packages
         at.secrets["TESTER_PASSWORD"] = password
         at.secrets["ANTHROPIC_API_KEY"] = "stand-in"
-        at.secrets["TESTER_MAX_SPEND_USD"] = "0.000001"
+        at.secrets["TESTER_MAX_SPEND_USD"] = "5"
         at.run()
         check("with TESTER_PASSWORD set, the page asks for it and shows nothing else",
               not at.exception and [t.label for t in at.text_input] == ["Password"] and not at.tabs, str(at.exception))
@@ -117,14 +121,22 @@ def built_in_mode():
         check("a wrong password is refused", "Wrong password" in texts(at.error) and not at.tabs, texts(at.error))
         at.text_input[0].set_value(password).run()
         check("the right password opens the page, which starts its own API and connects to it",
-              not at.exception and "Connected" in texts(at.sidebar.success) and "Built-in API" in texts(at.sidebar.caption),
+              not at.exception and "Connected" in texts(at.sidebar.success) and "Started by this page" in texts(at.sidebar.caption),
               f"{at.exception} {texts(at.error)}")
+        check("it starts auzy-risk with the small model too, and nothing on the page looks like an error",
+              "risk model: the small one (TF-IDF)" in texts(at.sidebar.caption) and not at.warning and not at.error,
+              f"{texts(at.sidebar.caption)} {texts(at.warning)} {texts(at.error)}")
         check("its address and keys can't be changed from the page", "API address" not in [t.label for t in at.sidebar.text_input])
         at.chat_input[0].set_value("I can't sleep").run()
-        check("a message gets a reply", len([m for m in at.chat_message if m.name == "assistant"]) == 1, texts(at.markdown))
+        replies = [m for m in at.chat_message if m.name == "assistant"]
+        check("with the risk service, a routine message goes to the routine model",
+              len(replies) == 1 and "claude-haiku-5-5" in texts(replies[0].caption), texts(at.caption))
+        at.button(key="sample_9").click().run()                 # crisis, English
+        check("a crisis phrase shows the emergency banner", "190" in texts(at.error), texts(at.error))
+        at.secrets["TESTER_MAX_SPEND_USD"] = "0.000001"
         at.chat_input[0].set_value("Still awake").run()
         check("past the spend limit, messages are paused",
-              len([m for m in at.chat_message if m.name == "assistant"]) == 1 and "spend limit" in texts(at.warning), texts(at.warning))
+              len([m for m in at.chat_message if m.name == "assistant"]) == 2 and "spend limit" in texts(at.warning), texts(at.warning))
         check("no error anywhere on the page", not at.exception, str(at.exception))
     finally:
         builtin_api.stop_all()

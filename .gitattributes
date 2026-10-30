@@ -1,2 +1,4 @@
 # Same line endings on every machine (Dockerfiles and scripts need LF)
 * text=auto eol=lf
+# Trained models are binary: never converted
+*.joblib binary

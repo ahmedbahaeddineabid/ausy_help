@@ -89,8 +89,9 @@ Without `AUZY_AI_URL`, the page starts its own API inside the app (built-in mode
 What runs there:
 - The API with in-memory storage: everything is lost when the app restarts or goes to sleep.
 - The demo catalog: three sample professionals, three tests, no appointments.
-- No risk model, which is too large for Community Cloud. The careful model answers every message, so messages cost
-  more than with it, up to about 1¢ each.
+- auzy-risk with the small TF-IDF model, because the full XLM-R model is too large for Community Cloud. Crisis phrases
+  and the choice between the two Claude models work as in production. In testing, the small model flagged 94% of
+  risk messages, against 98% for the full one, and Claude's own risk check still reads every message.
 - Everyone who opens the app shares this API, so the staff tabs show every tester's conversations.
 
 Keep it safe:
@@ -102,10 +103,11 @@ Keep it safe:
 ## Check
 
 `python tester/test_app.py` drives the page like a user (Streamlit AppTest). The stand-in answers instead of Claude,
-so it costs nothing. It runs 22 checks.
+so it costs nothing. It runs 25 checks.
 
 Against a running API, as `run_local.py` starts it:
 - connection;
+- with the risk service down, a note in the sidebar instead of a warning;
 - a reply with model and cost;
 - cards;
 - the emergency banner, the staff view and the urgent summary;
@@ -117,6 +119,8 @@ Against a running API, as `run_local.py` starts it:
 
 In built-in mode, as on Community Cloud:
 - the password;
-- the page's own API, whose address and keys can't be changed from the page;
-- a reply;
+- the page's own API and auzy-risk with the small model, with nothing on the page that looks like an error;
+- the API's address and keys can't be changed from the page;
+- a routine message answered by the routine model;
+- the emergency banner on a crisis phrase;
 - messages paused past the spend limit.

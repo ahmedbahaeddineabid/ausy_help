@@ -1,4 +1,7 @@
 streamlit==1.66.1
 requests==2.34.2
+# auzy-risk with the small TF-IDF model, which the page starts in built-in mode (scikit-learn: the version it was saved with)
+fastapi==0.143.2
+scikit-learn==1.9.1
 # Node for the page's built-in API on Streamlit Community Cloud, which has no recent Node; elsewhere it comes from PATH
 nodejs-wheel-binaries==24.19.0; sys_platform == "linux"

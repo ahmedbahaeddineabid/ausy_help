@@ -28,7 +28,8 @@ GET  /health
 - Without Docker, from the package root: `python -m uvicorn assistant.risk_server:app --host 0.0.0.0 --port 8001`.
 
 **Model location:** the models are shipped separately (`auzy-risk-model-xlmr.zip`). Unzip it into `models/`, so that
-`models/risk-xlmr/model.safetensors` and `models/risk-tfidf.joblib` exist.
+`models/risk-xlmr/model.safetensors` and `models/risk-tfidf.joblib` exist. The small one, `models/risk-tfidf.joblib`,
+is also in the repository: the tester's built-in mode runs auzy-risk with it.
 
 **Tests** (from the package root):
 - `python -m assistant.test_risk_server`: 8 tests, needs the model.

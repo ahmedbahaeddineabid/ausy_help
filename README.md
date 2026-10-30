@@ -26,6 +26,7 @@ and screening tests.
 | `docs/progress-report.html` | Project report: decisions, measured costs, open questions |
 
 The trained risk models come in a separate archive, `auzy-risk-model-xlmr.zip` (818 MB; 1.1 GB unzipped): XLM-R and the small TF-IDF fallback.
+The fallback (11 MB) is also in the repository, so that the tester can run auzy-risk on Streamlit Community Cloud.
 
 ## How it fits into Auzy
 
@@ -66,7 +67,7 @@ This starts auzy-risk (if its model is unzipped), the API with in-memory storage
 and the page at http://127.0.0.1:8501. Details are in `tester/README.md`.
 
 The page also runs on Streamlit Community Cloud, so testers need nothing installed. It then starts its own API inside
-the app, without the risk model. The steps and safety settings are in `tester/README.md`.
+the app, with auzy-risk on the small TF-IDF model. The steps and safety settings are in `tester/README.md`.
 
 ## Transfer steps
 
@@ -78,8 +79,8 @@ the app, without the risk model. The steps and safety settings are in `tester/RE
    - Unzip `auzy-risk-model-xlmr.zip` into `assistant/models/`, so that `assistant/models/risk-xlmr/model.safetensors` and
      `assistant/models/risk-tfidf.joblib` exist.
    - The same code is also a git repository: the `auzy-ai-api/` folder, and the private GitHub repository
-     `ahmedbahaeddineabid/ausy_help`, which you can clone or move to your code host. The model is not in it;
-     `.gitignore` keeps it out.
+     `ahmedbahaeddineabid/ausy_help`, which you can clone or move to your code host. It holds only the small TF-IDF
+     model; `.gitignore` keeps XLM-R out.
 3. **Configure**
    - Copy `.env.example` to `.env` and fill it in.
    - Use a **new** Anthropic API key. The development key was shared in a chat and must be revoked.
@@ -123,7 +124,7 @@ the app, without the risk model. The steps and safety settings are in `tester/RE
 | `test/mongo.store.check.mjs` | **9/9** against a real MongoDB (throwaway database) |
 | `test/e2e.local.mjs`: real API process, real MongoDB, real auzy-risk, stand-ins for Claude and auzy-backend, one restart midway | **9/9**: crisis → escalation and alert; tool cards; analysis delivered; state kept across the restart; idle analysis; risk service down → careful model |
 | `python -m assistant.test_risk_server` (project root) | **8/8** |
-| `python tester/test_app.py`: the tester page driven like a user, with a stand-in for Claude: against a running API, then in the built-in mode used on Streamlit Community Cloud | **22/22** |
+| `python tester/test_app.py`: the tester page driven like a user, with a stand-in for Claude: against a running API, then in the built-in mode used on Streamlit Community Cloud | **25/25** |
 | `test/integration.risk.mjs` (engine against auzy-risk) | passes; 31 ms per message on CPU |
 | The patches | apply cleanly to the files of the 2026-10-27 export, and the patched files still parse |
 

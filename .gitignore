@@ -9,9 +9,9 @@ __pycache__/
 *.pyc
 *.log
 
-# trained models: shipped separately (auzy-risk-model-xlmr.zip)
+# the full risk model ships separately (auzy-risk-model-xlmr.zip); the small one, risk-tfidf.joblib, is in the
+# repository for the tester on Streamlit Community Cloud
 assistant/models/risk-xlmr/
-assistant/models/risk-tfidf.joblib
 assistant/models/README.txt
 
 # runtime and test output

@@ -2,8 +2,8 @@
 
     python tester/run_local.py           starts the API (and auzy-risk) locally, then this page
     cd tester && streamlit run app.py    this page only: with AUZY_AI_URL, for an API that is already running;
-                                         without it, the page starts its own API (built-in mode, as on Streamlit
-                                         Community Cloud)
+                                         without it, the page starts its own API and auzy-risk (built-in mode, as
+                                         on Streamlit Community Cloud)
 
 Settings come from the environment or, on Community Cloud, from the app's secrets:
 - AUZY_AI_URL, AUZY_AI_API_KEY, AUZY_AI_STAFF_TOKEN: the API to use; the sidebar can change them.
@@ -87,7 +87,8 @@ if password and not ss.get("signed_in"):
 
 @st.cache_resource(show_spinner="Starting the built-in API (the first start installs its packages: up to a minute)…")
 def start_builtin_api(real_claude: bool) -> builtin_api.RunningApi:
-    return builtin_api.start(anthropic_key=setting("ANTHROPIC_API_KEY") if real_claude else None)
+    return builtin_api.start(anthropic_key=setting("ANTHROPIC_API_KEY") if real_claude else None,
+                             risk_url=setting("RISK_SERVICE_URL") or None, own_risk=True)
 
 
 builtin = None                                          # the page's own API, when no AUZY_AI_URL is set
@@ -166,8 +167,8 @@ def persona():
 with st.sidebar:
     st.header("API")
     if builtin:
-        st.caption("Built-in API, started by this page: in-memory storage (emptied when the app restarts), sample "
-                   "professionals and tests. Everyone using the page shares it: the staff tabs show every tester's conversations.")
+        st.caption("Started by this page, with test data kept in memory: it is emptied when the app restarts. Everyone "
+                   "using the page shares it, so the staff tabs show every tester's conversations.")
     else:
         st.text_input("API address", key="api_url")
         st.text_input("Service key (AUZY_AI_API_KEY)", type="password", key="service_key")
@@ -175,12 +176,16 @@ with st.sidebar:
     health = fetch_health(ss.api_url)
     if "error" in health:
         st.error(health["error"])
-    elif health.get("ok"):
-        st.success(f"Connected · storage {health['store']['kind']} · {health['auzy']} mode · level {health['budgetLevel']}")
-        if not health["riskService"]["ok"]:
-            st.warning("The risk service is not answering: the careful model answers every message meanwhile.")
-    else:
+    elif not health.get("ok"):
         st.error("The API answers but its storage is down.")
+    else:
+        st.success("Connected")
+        if not health["riskService"]["ok"]:
+            risk = "off, Claude screens every message"
+        else:
+            risk = "the small one (TF-IDF)" if builtin and builtin.risk else "on"
+        st.caption(f"Data: {'samples' if health['auzy'] == 'demo' else 'Auzy'} · storage: {health['store']['kind']} · "
+                   f"budget level: {health['budgetLevel']} · risk model: {risk}")
 
     st.header("Test patient")
     st.text_input("Conversation id", key="conversation_id")
@@ -307,7 +312,7 @@ def send(text: str):
         st.error("The conversation and profile ids must be 24 hexadecimal characters.")
         return
     if ss.credits <= 0:
-        st.warning("No credits left: add credits in the sidebar or start a new conversation.")
+        st.info("No credits left: add credits in the sidebar or start a new conversation.")
         return
     if spend_paused():
         return
