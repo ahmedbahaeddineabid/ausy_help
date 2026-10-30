@@ -317,7 +317,7 @@ flowchart TD
     <ul>
       <li>auzy-backend sends a patient's messages to the API only if the profile is on the test list. Everyone else keeps today's chat. If the API can't be reached, today's chat answers.</li>
       <li>auzy-backend gets five new files: a queue consumer, a small client, and internal routes for the three lookups, the Cognisys read and the delivery of each analysis. It also gets two small patches (the chat route and the user-message queue). No existing file is replaced.</li>
-      <li>The frontend gets one patch: the emergency banner stays visible while a conversation is escalated.</li>
+      <li>The frontend gets two patches: the emergency banner stays visible while a conversation is escalated, and the chat store keeps the message data the banner is drawn from.</li>
       <li>The API keeps its own database on Auzy's MongoDB. It never touches Auzy's data: lookups and saves go through auzy-backend with a shared secret.</li>
       <li>The auzy-risk service runs as a separate container on the internal network (about 1.5 GB of RAM).</li>
       <li>Staff endpoints: clinician summaries, a conversation's state, clearing an escalation, and a cost report.</li>

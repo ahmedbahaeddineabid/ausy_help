@@ -107,8 +107,10 @@ the app, with auzy-risk on the small TF-IDF model. The steps and safety settings
    - Add the variables from `auzy-ai-v2/integration/auzy-backend.env.example`, starting with your own test accounts
      in `AI_V2_TEST_PROFILES`, then restart.
 6. **auzy-frontend:** from inside the repository, run
-   `git apply -p2 <package>/auzy-ai-v2/integration/patches/auzy-frontend-ChatWindow.jsx.diff`.
-   This keeps the emergency banner visible while a conversation is escalated.
+   `git apply -p2 <package>/auzy-ai-v2/integration/patches/auzy-frontend-*.diff`.
+   The two patches show the emergency banner while a conversation is escalated:
+   - `ChatWindow.jsx` draws it;
+   - `chat.store.js` keeps each message's `metadata`, which the banner is drawn from and which the store used to drop.
 7. **Test from the test accounts** (the full checklist is in `auzy-ai-v2/README.md`, "Testing inside Auzy"):
    - Chat in each language.
    - Run out of credits and check the closing message, the Cognisys update and the pre-diagnostic in Auzy.
@@ -126,7 +128,7 @@ the app, with auzy-risk on the small TF-IDF model. The steps and safety settings
 | `python -m assistant.test_risk_server` (project root) | **8/8** |
 | `python tester/test_app.py`: the tester page driven like a user, with a stand-in for Claude: against a running API, then in the built-in mode used on Streamlit Community Cloud | **25/25** |
 | `test/integration.risk.mjs` (engine against auzy-risk) | passes; 31 ms per message on CPU |
-| The patches | apply cleanly to the files of the 2026-10-27 export, and the patched files still parse |
+| The patches | apply cleanly to the files of the 2026-10-27 export, and the patched files still parse. With the store patch, a message keeps its `metadata` (checked with zod 4); without it, the banner never had its data. |
 
 **Not run yet:**
 - Docker builds.
@@ -173,6 +175,9 @@ These estimates assume 10% crisis conversations. Each conversation has a ceiling
   or Arabic script), Arabic and French, then say so in `src/lib/ai/prompts/analysis.prompt.js`.
 - Which roles may read the staff views?
 - Should an escalation also notify the consultant inside the app?
+- **Appointment and test cards:** Auzy's chat store (`normalizeMessage` in auzy-frontend's `src/store/chat.store.js`)
+  drops each message's `appointments` and `tests`, so these cards never show, in today's chat as well. Keeping them
+  like `profiles` fixes it, but it changes the chat for every patient, so it is your call.
 
 **Before go-live:**
 - **Emergency number:** `190` (SAMU) is the default; confirm it.

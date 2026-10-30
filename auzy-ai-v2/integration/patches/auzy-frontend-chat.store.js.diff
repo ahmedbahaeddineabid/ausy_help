@@ -1,0 +1,19 @@
+--- a/auzy-frontend/src/store/chat.store.js
++++ b/auzy-frontend/src/store/chat.store.js
+@@ -32,6 +32,8 @@
+     profiles: z.array(z.any()).optional().default([]),
+     // Optional choices for assistant messages (quick-replies)
+     choices: z.array(ChoiceSchema).optional().default([]),
++    // AI v2: the escalation state (metadata.ai), which ChatWindow reads for the emergency banner
++    metadata: z.record(z.string(), z.any()).optional(),
+     createdAt: z.coerce.date().optional().default(() => new Date()),
+     updatedAt: z.coerce.date().optional().default(() => new Date()),
+ });
+@@ -69,6 +71,7 @@
+         transcript: msg?.transcript ?? "",
+         profiles: Array.isArray(msg?.profiles) ? msg.profiles : [],
+         choices: Array.isArray(msg?.choices) ? msg.choices : [],
++        metadata: msg?.metadata && typeof msg.metadata === "object" ? msg.metadata : undefined,
+         createdAt: msg?.createdAt ? new Date(msg.createdAt) : new Date(),
+     };
+ 

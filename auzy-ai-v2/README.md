@@ -166,6 +166,8 @@ the Streamlit tester page together (see `../tester/README.md`).
    - "Can you show me a professional?" shows consultant cards.
    - A question about appointments shows the patient's own appointments.
    - A question about tests shows test cards.
+   - Auzy's chat store drops appointment and test cards today, in its own chat too. They show once it keeps them
+     (see "Decisions still open" in `../README.md`).
 2. **Language switch:** change the chat language mid-conversation; the next reply follows it.
 3. **Last credit:** a short, warm closing that mentions the pre-assessment.
    - About a minute later, the pre-diagnostic notification appears.
@@ -174,7 +176,7 @@ the Streamlit tester page together (see `../tester/README.md`).
 4. **Idle:** stop writing for 30 minutes; `GET /v1/conversations/:id` shows a new analysis.
 5. **Crisis** (warn the person on call first: it sends a real alert):
    - The reply is careful and includes the emergency number.
-   - The banner stays visible.
+   - The banner stays visible, also after reloading the page.
    - The escalation webhook fires.
    - `GET /v1/summaries?urgent=true` shows the summary.
    - Clear the escalation afterwards.
